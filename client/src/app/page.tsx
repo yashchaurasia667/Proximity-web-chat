@@ -1,16 +1,13 @@
 "use client";
 
-import { Application, extend } from "@pixi/react";
-import { Container, Graphics, Sprite } from "pixi.js";
-
 import { useEffect, useRef } from "react";
+import { Application, extend } from "@pixi/react";
 
 import Player from "./Player";
+import { Container } from "pixi.js";
 
 extend({
   Container,
-  Graphics,
-  Sprite,
 });
 
 export default function App() {
