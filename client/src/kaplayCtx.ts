@@ -1,18 +1,25 @@
 import kaplay from "kaplay";
 
-// const canvas = document.getElementById("game");
+// const canvas = document.getElementById("game") as HTMLCanvasElement;
 // if (!(canvas instanceof HTMLCanvasElement)) {
 //   throw new Error("Canvas element with id 'game' not found or is not a <canvas>.");
 // }
 
 export default function makeKaplayCtx() {
+  // canvas.getContext("2d");
+  // const background = new Image();
+  // background.src = "/areas/main_area.png";
+
   return kaplay({
     global: false,
-    pixelDensity: 2,
+    // pixelDensity: 2,
     touchToMouse: true,
-    debug: true,    //TODO: set to false in production
+    debug: true, //TODO: set to false in production
     debugKey: "`",
-    canvas: document.getElementById("game") as HTMLCanvasElement
-    // canvas: canvas
-  })
+    // canvas: canvas,
+    width: 1920,
+    height: 1080,
+    letterbox: true,
+    maxFPS: 60,
+  });
 }
