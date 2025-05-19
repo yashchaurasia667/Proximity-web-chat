@@ -46,5 +46,5 @@ export default async function initGame() {
     else map.width = k.width();
   });
 
-  makePlayer(k, k.vec2(k.center()), 700);
+  makePlayer(k, k.vec2(k.center()));
 }
