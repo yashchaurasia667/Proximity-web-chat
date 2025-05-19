@@ -17,9 +17,10 @@ export default function makeKaplayCtx() {
     debug: true, //TODO: set to false in production
     debugKey: "`",
     // canvas: canvas,
-    width: 1920,
-    height: 1080,
-    letterbox: true,
+    // width: 1920,
+    // height: 1080,
+    // letterbox: true,
+    background: [0, 0, 0, 0],
     maxFPS: 60,
   });
 }
