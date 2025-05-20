@@ -1,7 +1,7 @@
 import type { KAPLAYCtx, Vec2 } from "kaplay";
 
 export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2) {
-  let vel= k.vec2(0, 0);
+  let vel = k.vec2(0, 0);
 
   const player = k.add([
     k.sprite("player", { anim: "walk-down-idle" }),
@@ -18,25 +18,23 @@ export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2) {
     },
   ]);
 
-  const movePlayer = (
-    key: string,
-    anim: string,
-    velocity: Vec2
-  ) => {
+  const movePlayer = (key: string, anim: string, velocity: Vec2) => {
     player.onKeyPress(key, () => {
       k.debug.log(`${key} pressed`);
-      vel= velocity;
+      vel = velocity;
       player.play(anim);
     });
     player.onKeyRelease(key, () => {
       k.debug.log(`${key} released`);
-      vel = k.vec2(0, 0);
-      player.play(`${anim}-idle`);
+      if (vel == velocity) {
+        vel = k.vec2(0, 0);
+        player.play(`${anim}-idle`);
+      }
     });
   };
 
   movePlayer("w", "walk-up", k.vec2(0, -200));
-  movePlayer("up", "walk-up", k.vec2(0, -200 ));
+  movePlayer("up", "walk-up", k.vec2(0, -200));
 
   movePlayer("s", "walk-down", k.vec2(0, 200));
   movePlayer("down", "walk-down", k.vec2(0, 200));
