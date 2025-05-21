@@ -1,4 +1,4 @@
-import type { KAPLAYCtx, Vec2 } from "kaplay";
+import type { Vec2, KAPLAYCtx } from "kaplay";
 
 export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2, speed: number) {
   let vel = k.vec2(0, 0);
@@ -49,9 +49,21 @@ export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2, speed: number) {
     player.move(vel);
   });
 
-  k.onClick("main_area", (e) => {
-    k.debug.log(player.pos);
-    console.log(e);
+  k.onClick("main_area", () => {
+    const clickPos = k.mousePos();
+
+    const destMarker = k.add([k.pos(clickPos), k.circle(8)]);
+    player.moveTo(clickPos);
+    destMarker.destroy();
+
+    // k.debug.log(`player: ${player.pos}`);
+    // k.debug.log(`mouse: ${k.mousePos()}`);
+    // const dest = k.vec2(
+    //   k.mousePos().x - player.pos.x,
+    //   k.mousePos().y - player.pos.y
+    // );
+    // k.debug.log(`dest: ${dest}`);
+    // player.moveTo(dest, speed);
   });
 
   return player;

@@ -1,7 +1,18 @@
-/* @import "tailwindcss"; */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-base: #1e1b2e;
+  --color-highlight: #2a273f;
+  --color-elevated-highlight: #5d6fc5;
+  --color-press: #000;
+
+  --color-text-base: #d9dbe1;
+  --color-subdued: #a0a2b3;
+
+  --color-positive: #a6a6d0;
+  --color-accent: #7ec4cf;
+  --color-negative: #ed2c3f;
+}
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -17,6 +28,7 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
 /*
 a {
   font-weight: 500;
