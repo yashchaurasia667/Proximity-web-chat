@@ -2,7 +2,6 @@ import makeKaplayCtx from "./kaplayCtx";
 import makePlayer from "./player";
 
 export default async function initGame() {
-  console.log("hello");
   const k = makeKaplayCtx();
 
   // player sprite
@@ -35,17 +34,16 @@ export default async function initGame() {
     k.sprite("main_area"),
     k.area(),
     k.anchor("center"),
-    // k.pos(k.width() / 2, k.height() / 2),
     k.pos(k.center()),
     k.width() > k.height()
       ? k.sprite("main_area", { height: k.height() })
       : k.sprite("main_area", { width: k.width() }),
+    "main_area"
   ]);
   k.onResize(() => {
-    // console.log("resize");
     if (k.width() > k.height()) map.height = k.height();
     else map.width = k.width();
   });
 
-  makePlayer(k, k.vec2(k.center()));
+  makePlayer(k, k.vec2(k.center()), 300);
 }

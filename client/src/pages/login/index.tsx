@@ -1,8 +1,7 @@
 const Login = () => {
   return (
-    <>
-      login
-    </>
+    <div className="w-full min-h-[100vh] bg-base">
+    </div>
   )
 }
 

@@ -1,6 +1,6 @@
 import type { KAPLAYCtx, Vec2 } from "kaplay";
 
-export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2) {
+export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2, speed: number) {
   let vel = k.vec2(0, 0);
 
   const player = k.add([
@@ -18,7 +18,7 @@ export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2) {
     },
   ]);
 
-  const movePlayer = (key: string, anim: string, velocity: Vec2) => {
+  const movePlayerKeyboard = (key: string, anim: string, velocity: Vec2) => {
     player.onKeyPress(key, () => {
       k.debug.log(`${key} pressed`);
       vel = velocity;
@@ -33,20 +33,25 @@ export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2) {
     });
   };
 
-  movePlayer("w", "walk-up", k.vec2(0, -200));
-  movePlayer("up", "walk-up", k.vec2(0, -200));
+  movePlayerKeyboard("w", "walk-up", k.vec2(0, -speed));
+  movePlayerKeyboard("up", "walk-up", k.vec2(0, -speed));
 
-  movePlayer("s", "walk-down", k.vec2(0, 200));
-  movePlayer("down", "walk-down", k.vec2(0, 200));
+  movePlayerKeyboard("s", "walk-down", k.vec2(0, speed));
+  movePlayerKeyboard("down", "walk-down", k.vec2(0, speed));
 
-  movePlayer("a", "walk-left", k.vec2(-200, 0));
-  movePlayer("left", "walk-left", k.vec2(-200, 0));
+  movePlayerKeyboard("a", "walk-left", k.vec2(-speed, 0));
+  movePlayerKeyboard("left", "walk-left", k.vec2(-speed, 0));
 
-  movePlayer("d", "walk-right", k.vec2(200, 0));
-  movePlayer("right", "walk-right", k.vec2(200, 0));
+  movePlayerKeyboard("d", "walk-right", k.vec2(speed, 0));
+  movePlayerKeyboard("right", "walk-right", k.vec2(speed, 0));
 
   k.onUpdate(() => {
     player.move(vel);
+  });
+
+  k.onClick("main_area", (e) => {
+    k.debug.log(player.pos);
+    console.log(e);
   });
 
   return player;
