@@ -7,7 +7,7 @@ const Login = () => {
           <div className="text-xl">Login</div>
         </div>
         <div>
-          <img src="/assets/bg_login.png" />
+          <img src="/logos/bg_login.png" />
         </div>
       </div>
     </div>
