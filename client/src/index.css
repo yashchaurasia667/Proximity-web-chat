@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "pixelated";
+  src: url("/fonts/pixelated.TTF");
+}
+
 @theme {
   --color-base: #1e1b2e;
   --color-highlight: #2a273f;
@@ -12,6 +17,8 @@
   --color-positive: #a6a6d0;
   --color-accent: #7ec4cf;
   --color-negative: #ed2c3f;
+
+  --font-pixelated: "pixelated";
 }
 
 :root {

@@ -33,6 +33,21 @@ export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2, speed: number) {
     });
   };
 
+  const movePlayerMouse = (clickPos: Vec2) => {
+    const distance = clickPos.sub(player.pos);
+    // k.debug.log(`${Math.abs(distance.x)}  ${Math.abs(distance.y)}`);
+
+    if (Math.abs(distance.y) < Math.abs(distance.x)) {
+      // distance.y < 0 ? player.play("walk-up") : player.play("walk-down");
+      player.moveTo(player.pos.x, clickPos.y);
+      // distance.x < 0 ? player.play("walk-left") : player.play("walk-right");
+      player.moveTo(clickPos.x, player.pos.y);
+    } else {
+      player.moveTo(clickPos.x, player.pos.y);
+      player.moveTo(player.pos.x, clickPos.y);
+    }
+  };
+
   movePlayerKeyboard("w", "walk-up", k.vec2(0, -speed));
   movePlayerKeyboard("up", "walk-up", k.vec2(0, -speed));
 
@@ -53,17 +68,9 @@ export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2, speed: number) {
     const clickPos = k.mousePos();
 
     const destMarker = k.add([k.pos(clickPos), k.circle(8)]);
-    player.moveTo(clickPos);
+    // player.moveTo(clickPos);
+    movePlayerMouse(clickPos);
     destMarker.destroy();
-
-    // k.debug.log(`player: ${player.pos}`);
-    // k.debug.log(`mouse: ${k.mousePos()}`);
-    // const dest = k.vec2(
-    //   k.mousePos().x - player.pos.x,
-    //   k.mousePos().y - player.pos.y
-    // );
-    // k.debug.log(`dest: ${dest}`);
-    // player.moveTo(dest, speed);
   });
 
   return player;
