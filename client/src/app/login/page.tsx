@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const Login = () => {
   return (
     <div className="w-full min-h-screen bg-base">
@@ -7,7 +9,8 @@ const Login = () => {
           <div className="text-xl">Login</div>
         </div>
         <div>
-          <img src="/logos/bg_login.png" />
+          {/* <img src="/logos/bg_login.png" /> */}
+          <Image src={"/logos/bg_login.png"} width={100} height={100} alt="login background"/>
         </div>
       </div>
     </div>

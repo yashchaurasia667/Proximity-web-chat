@@ -20,12 +20,12 @@ export default function makePlayer(k: KAPLAYCtx, posVec2: Vec2, speed: number) {
 
   const movePlayerKeyboard = (key: string, anim: string, velocity: Vec2) => {
     player.onKeyPress(key, () => {
-      k.debug.log(`${key} pressed`);
+      // k.debug.log(`${key} pressed`);
       vel = velocity;
       player.play(anim);
     });
     player.onKeyRelease(key, () => {
-      k.debug.log(`${key} released`);
+      // k.debug.log(`${key} released`);
       if (vel == velocity) {
         vel = k.vec2(0, 0);
         player.play(`${anim}-idle`);

@@ -1,21 +1,33 @@
-/** @type {import("tailwindcss").Config} */
+import type { Config } from "tailwindcss";
+
 export default {
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
   theme: {
     extend: {
       colors: {
-        "base": "#1e1b2e",
-        "highlight": "#2a273f",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        base: "#1e1b2e",
+        highlight: "#2a273f",
         "elevated-highlight": "#5d6fc5",
-        "press": "#000",
+        "elevated-hover": "#455abf",
+        press: "#000",
 
-        "text-base": "d9dbe1",
+        "text-base": "#d9bde1",
         "subdued": "#a0a2b3",
-        "positive": "#a6a6d0",
-        "accent": "#7ec4cf",
-        "negative": "#ed2c3f",
+
+        positive: "#a6a6d0",
+        accent: "#7ec4cf",
+        negative: "#ed2c3f"
       },
-    },
+      fontFamily: {
+        "pixelated": ["pixelated"]
+      },
+    }
   },
   plugins: [],
-};
+} satisfies Config;
