@@ -1,3 +1,4 @@
+import Image from 'next/image'
 interface props {
   up: string;
   down: string;
@@ -8,10 +9,10 @@ interface props {
 const ControlKeys = ({ up, down, left, right }: props) => {
   return (
     <div className="font-pixelated text-lg grid grid-cols-3 grid-rows-2 w-[150px]">
-      <img src={up} className="row-start-1 col-start-2" />
-      <img src={left} className="row-start-2" />
-      <img src={down} className="row-start-2" />
-      <img src={right} className="row-start-2" />
+      <Image src={up} className="row-start-1 col-start-2" width={50} height={50} alt="up" />
+      <Image src={left} className="row-start-2" width={50} height={50} alt="down" />
+      <Image src={down} className="row-start-2" width={50} height={50} alt="left" />
+      <Image src={right} className="row-start-2" width={50} height={50} alt="right" />
     </div>
   );
 };

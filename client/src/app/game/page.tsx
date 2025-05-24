@@ -1,15 +1,16 @@
 "use client";
 
+import { useEffect } from "react";
 import initGame from "../../kaplay/initGame";
 
 import ControlKeys from "./ControlKeys";
 import Chat from "./Chat";
-import { useEffect } from "react";
 
 const Game = () => {
   useEffect(() => {
     initGame();
   }, []);
+
   return (
     <>
       <div className="font-pixelated absolute text-lg right-0 bottom-0 py-8">
