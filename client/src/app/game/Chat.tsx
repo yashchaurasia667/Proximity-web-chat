@@ -1,11 +1,17 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { io } from "socket.io-client";
+import { Socket } from "socket.io-client";
 
-const socket = io("http://localhost:5000");
-const Chat = () => {
-  const [messages, setMessages] = useState<{ message: string; id: string }[]>(
-    []
-  );
+interface props {
+  socket: Socket;
+}
+
+type message = {
+  message: string;
+  id: string;
+};
+
+const Chat = ({ socket }: props) => {
+  const [messages, setMessages] = useState<message[]>([]);
   const [messageInput, setMessageInput] = useState<string>("");
 
   const messageBox = useRef<HTMLInputElement | null>(null);
@@ -14,7 +20,13 @@ const Chat = () => {
     socket.on("message", (data) => {
       setMessages([...messages, data]);
     });
-  }, [messages]);
+    socket.on("joined", (id) => {
+      setMessages([...messages, { id: id, message: "has joined the chat" }]);
+    });
+    socket.on("left", (id) => {
+      setMessages([...messages, { id: id, message: "has disconnected" }]);
+    });
+  }, [messages, socket]);
 
   const sendMessage = (e: FormEvent) => {
     e.preventDefault();
@@ -25,14 +37,14 @@ const Chat = () => {
   };
 
   const messageLog = useMemo(() => {
-    return messages.map((message, index) => <div key={index}>{`${message.id}: ${message.message}`}</div>);
+    return messages.map((message, index) => (
+      <div key={index}>{`${message.id}: ${message.message}`}</div>
+    ));
   }, [messages]);
 
   return (
     <div className="absolute left-0 bottom-0 ml-2 mb-2 w-[400px]">
-      <div className=" bg-[#00000099] ml-1 rounded-md p-4">
-        {messageLog}
-      </div>
+      <div className=" bg-[#00000099] ml-1 rounded-md p-4">{messageLog}</div>
       <div className="flex items-center pl-4 gap-x-3 rounded-full bg-[#00000099] mt-3">
         <p>Chat: </p>
         <form className="w-full" onSubmit={sendMessage}>

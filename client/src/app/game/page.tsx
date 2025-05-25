@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
+import { io } from "socket.io-client";
 import initGame from "../../kaplay/initGame";
 
 import ControlKeys from "./ControlKeys";
 import Chat from "./Chat";
 
+const socket = io("http://localhost:5000");
 const Game = () => {
   useEffect(() => {
-    initGame();
+    initGame(socket);
   }, []);
 
   return (
@@ -31,7 +33,7 @@ const Game = () => {
         </div>
         <div className="text-center mt-3">up, down, left, right</div>
       </div>
-      <Chat />
+      <Chat socket={socket} />
     </>
   );
 };

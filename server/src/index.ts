@@ -28,15 +28,20 @@ let id: string;
 
 io.on("connection", (socket) => {
   id = socket.id;
-  console.log(`${socket.id} has connected`);
+  io.emit("joined", id);
 
   socket.on("disconnect", () => {
-    console.log(`${socket.id} has disconnected`);
+    io.emit("left", id);
   });
 
   socket.on("message", (msg) => {
-    console.log(`${id}==> ${msg}`);
-    io.emit("message", {message: msg, id: id});
+    // console.log(`${id}==> ${msg}`);
+    io.emit("message", { message: msg, id: id });
+  });
+
+  socket.on("movement", (pos) => {
+    // console.log(pos);
+    io.emit("movement", { id: id, pos: pos });
   });
 });
 
