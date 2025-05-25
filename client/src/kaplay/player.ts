@@ -3,6 +3,7 @@ import { Socket } from "socket.io-client";
 
 export default class Member {
   public id: string;
+  protected pos: Vec2;
   private k: KAPLAYCtx;
   private player: GameObj;
   private socket: Socket;
@@ -15,7 +16,8 @@ export default class Member {
     this.SPEED = speed;
 
     this.player = this.makePlayer(k, k.vec2(k.center()));
-    this.enableMovement();
+    this.pos = this.player.pos;
+    if (id == "player") this.enableMovement();
   }
 
   private makePlayer(k: KAPLAYCtx, posVec2: Vec2) {
@@ -35,7 +37,12 @@ export default class Member {
     ]);
   }
 
+  public moveRemote(pos: Vec2) {
+    this.player.moveTo(pos);
+  }
+
   private emitMovement() {
+    console.log("emitting");
     this.socket.emit("movement", this.player.pos);
   }
 
@@ -43,14 +50,17 @@ export default class Member {
     this.player.onKeyPress(key, () => {
       this.player.vel = velocity;
       this.player.play(anim);
-      this.emitMovement();
+      setTimeout(() => {
+        this.emitMovement();
+      }, 100);
     });
 
     this.player.onKeyRelease(key, () => {
       if (this.player.vel == velocity) {
         this.player.vel = this.k.vec2(0, 0);
         this.player.play(`${anim}-idle`);
-        this.emitMovement();
+        // clearTimeout(500);
+        // this.emitMovement();
       }
     });
   }
@@ -78,7 +88,9 @@ export default class Member {
     this.movePlayerKeyboard("right", "walk-right", this.k.vec2(this.SPEED, 0));
 
     this.k.onUpdate(() => {
-      this.player.move(this.player.vel);
+      setTimeout(() => {
+        this.player.move(this.player.vel);
+      }, 500);
     });
 
     this.k.onClick("main_area", () => {
@@ -93,5 +105,9 @@ export default class Member {
       // ]);
       this.movePlayerMouse(clickPos);
     });
+  }
+
+  public destroy() {
+    this.player.destroy();
   }
 }

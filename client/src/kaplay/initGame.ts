@@ -1,16 +1,17 @@
 import makeKaplayCtx from "./kaplayCtx";
+import Lobby from "./lobby";
 import Member from "./player";
 
 import { Socket } from "socket.io-client";
 
-type roomMember = {
-  id: string;
-  player: Member;
-};
+// type roomMember = {
+//   id: string;
+//   player: Member;
+// };
 
 export default async function initGame(socket: Socket) {
   // const roomMembers: { id: string; player: GameObj } = [];
-  const roomMembers: roomMember[] = [];
+  // const roomMembers: roomMember[] = [];
 
   const k = makeKaplayCtx();
   const SPEED = 150;
@@ -59,5 +60,19 @@ export default async function initGame(socket: Socket) {
 
   // PLAYER CONTROLS
   const player = new Member("player", k, SPEED, socket);
-  roomMembers.push({ id: player.id, player: player });
+  // roomMembers.push({ id: player.id, player: player });
+
+  // LOBBY
+  const lobby = new Lobby();
+  lobby.addMember(player);
+
+  socket.on("joined", (id) => {
+    const member = new Member(id, k, SPEED, socket);
+    lobby.addMember(member);
+  });
+
+  socket.on("left", (id) => {
+    console.log("left");
+    lobby.removeMember(id);
+  });
 }
