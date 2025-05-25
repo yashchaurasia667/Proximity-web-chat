@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint:check": "next lint",
-    "lint:fix": "next lint --fix",
-    "prepare": "husky"
+    "lint": "next lint --fix"
   },
   "dependencies": {
     "kaplay": "^3001.0.18",
