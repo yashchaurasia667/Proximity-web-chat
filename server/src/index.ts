@@ -1,50 +1,23 @@
 import express from "express";
-import { createServer } from "node:http";
 import dotenv from "dotenv";
-import { Server } from "socket.io";
 import cors from "cors";
 
+import { app, server } from "./global.d.js";
+import socketStart from "./controllers/gameController.js";
+
 dotenv.config();
-
-const app = express();
-const server = createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    credentials: true,
-  },
-});
-
 const PORT = process.env.PORT || 8000;
+
+app.disable("x-powered-by");
+app.use(express.json());
 app.use(cors());
 
-app.get("/api", (req, res) => {
-  res.json({
-    message: "Hello world",
-  });
+app.get("/ping", (req, res) => {
+  res.json("pongg..");
 });
 
-let id: string;
-
-io.on("connection", (socket) => {
-  id = socket.id;
-  io.emit("joined", id);
-
-  socket.on("disconnect", () => {
-    io.emit("left", id);
-  });
-
-  socket.on("message", (msg) => {
-    // console.log(`${id}==> ${msg}`);
-    io.emit("message", { message: msg, id: id });
-  });
-
-  socket.on("movement", (pos) => {
-    // console.log(pos);
-    io.emit("movement", { id: id, pos: pos });
-  });
-});
+socketStart();
 
 server.listen(PORT, () => {
-  console.log(`server listening on port ${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
 });

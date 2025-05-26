@@ -8,7 +8,7 @@ interface props {
 
 const ControlKeys = ({ up, down, left, right }: props) => {
   return (
-    <div className="font-pixelated text-lg grid grid-cols-3 grid-rows-2 w-[150px]">
+    <div className="font-pixelated justify-center items-center text-lg grid grid-cols-3 grid-rows-2 w-[150px]">
       <Image src={up} className="row-start-1 col-start-2" width={50} height={50} alt="up" />
       <Image src={left} className="row-start-2" width={50} height={50} alt="down" />
       <Image src={down} className="row-start-2" width={50} height={50} alt="left" />

@@ -3,21 +3,28 @@ import { Socket } from "socket.io-client";
 
 export default class Member {
   public id: string;
-  protected pos: Vec2;
+  public pos: Vec2;
   private k: KAPLAYCtx;
   private player: GameObj;
   private socket: Socket;
   private SPEED: number;
 
-  constructor(id: string, k: KAPLAYCtx, speed: number, socket: Socket) {
+  constructor(
+    id: string,
+    k: KAPLAYCtx,
+    speed: number,
+    socket: Socket,
+    type: "player" | "remote",
+    pos: Vec2
+  ) {
     this.id = id;
     this.k = k;
     this.socket = socket;
     this.SPEED = speed;
+    this.pos = pos;
 
-    this.player = this.makePlayer(k, k.vec2(k.center()));
-    this.pos = this.player.pos;
-    if (id == "player") this.enableMovement();
+    this.player = this.makePlayer(k, pos);
+    if (type == "player") this.enableMovement();
   }
 
   private makePlayer(k: KAPLAYCtx, posVec2: Vec2) {
@@ -96,13 +103,14 @@ export default class Member {
     this.k.onClick("main_area", () => {
       const clickPos = this.k.mousePos();
 
-      // this.k.add([
-      //   this.k.pos(clickPos),
-      //   this.k.circle(8),
-      //   this.k.lifespan(1, {
-      //     fade: 0.5,
-      //   }),
-      // ]);
+      this.k.add([
+        this.k.pos(clickPos),
+        this.k.circle(8),
+        this.k.lifespan(0.5, {
+          fade: 0,
+        }),
+        this.k.opacity(1),
+      ]);
       this.movePlayerMouse(clickPos);
     });
   }

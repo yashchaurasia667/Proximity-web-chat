@@ -1,23 +1,46 @@
+import { Socket } from "socket.io-client";
+import { KAPLAYCtx, Vec2 } from "kaplay";
 import Member from "./player";
 
 export default class Lobby {
-  private lobby: Member[];
-  constructor() {
-    this.lobby = [];
-    // this.lobby.push(player);
-  }
+  // private lobby: { id: string; pos: Vec2; player: Member }[];
 
-  addMember(player: Member) {
-    this.lobby.push(player);
-  }
+  // {id: {pos, player}}
+  private lobby = new Map<string, { pos: Vec2; player: Member }>();
+  private k: KAPLAYCtx;
+  private socket: Socket;
+  private SPEED: number;
 
-  removeMember(id: string) {
-    this.lobby.filter((player) => {
-      console.log(player);
-      if (player.id !== id) {
-        return player;
-      } else player.destroy();
+  constructor(
+    k: KAPLAYCtx,
+    speed: number,
+    socket: Socket,
+    type: "player" | "remote"
+  ) {
+    this.socket = socket;
+    this.SPEED = speed;
+    this.k = k;
+    this.addMember(socket.id!, type);
+
+    socket.on("player_joined", (data) => {
+      if (this.lobby.has(data.id)) return;
+      this.addMember(data.id, "remote", k.vec2(data.pos.x, data.pos.y));
     });
-    console.log(this.lobby);
+
+    socket.on("player_left", (data) => {
+      if (this.lobby.has(data.id)) this.removeMember(data.id);
+    });
+  }
+
+  private addMember(id: string, type: "player" | "remote", pos?: Vec2) {
+    pos = pos ? pos : this.k.center();
+    const player = new Member(id, this.k, this.SPEED, this.socket, type, pos);
+    this.lobby.set(player.id, { pos: player.pos, player });
+    this.socket.emit("player_joined", { id, pos });
+  }
+
+  private removeMember(id: string) {
+    this.lobby.get(id)?.player.destroy();
+    this.lobby.delete(id);
   }
 }

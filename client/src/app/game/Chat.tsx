@@ -6,8 +6,8 @@ interface props {
 }
 
 type message = {
-  message: string;
   id: string;
+  message: string;
 };
 
 const Chat = ({ socket }: props) => {
@@ -17,21 +17,26 @@ const Chat = ({ socket }: props) => {
   const messageBox = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    socket.on("message", (data) => {
+    socket.on("player_joined", (data) => {
+      setMessages([
+        ...messages,
+        { id: data.id, message: "has joined the chat" },
+      ]);
+    });
+
+    socket.on("player_left", (data) => {
+      setMessages([...messages, { id: data.id, message: "has disconnected" }]);
+    });
+
+    socket.on("chat_message", (data) => {
       setMessages([...messages, data]);
-    });
-    socket.on("joined", (id) => {
-      setMessages([...messages, { id: id, message: "has joined the chat" }]);
-    });
-    socket.on("left", (id) => {
-      setMessages([...messages, { id: id, message: "has disconnected" }]);
     });
   }, [messages, socket]);
 
   const sendMessage = (e: FormEvent) => {
     e.preventDefault();
     if (messageInput) {
-      socket.emit("message", messageInput);
+      socket.emit("chat_message", { id: socket.id, message: messageInput });
       setMessageInput("");
     }
   };

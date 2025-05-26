@@ -7,7 +7,7 @@ import initGame from "../../kaplay/initGame";
 import ControlKeys from "./ControlKeys";
 import Chat from "./Chat";
 
-const socket = io("http://localhost:5000");
+const socket = io("http://localhost:9000");
 const Game = () => {
   useEffect(() => {
     initGame(socket);
