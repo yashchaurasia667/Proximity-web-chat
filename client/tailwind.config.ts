@@ -13,9 +13,9 @@ export default {
         foreground: "var(--foreground)",
         base: "#1e1b2e",
         highlight: "#2a273f",
+        press: "#000",
         "elevated-highlight": "#5d6fc5",
         "elevated-hover": "#455abf",
-        press: "#000",
 
         "text-base": "#d9bde1",
         "subdued": "#a0a2b3",

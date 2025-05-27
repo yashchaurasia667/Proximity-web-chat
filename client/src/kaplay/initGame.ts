@@ -3,7 +3,7 @@ import Lobby from "./lobby";
 
 export default async function initGame() {
   const k = makeKaplayCtx();
-  const SPEED = 150;
+  const SPEED = 200;
 
   // player sprite
   k.loadSprite("player", "/sprites/gameboy/player.png", {
