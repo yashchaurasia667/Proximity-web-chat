@@ -1,3 +1,5 @@
+import { io } from "socket.io-client";
+
 const throttle = (callback: () => void, delay: number) => {
   let wait = false;
   if (wait) return;
@@ -8,4 +10,6 @@ const throttle = (callback: () => void, delay: number) => {
   }, delay);
 };
 
-export { throttle };
+const socket = io("http://localhost:9000");
+
+export { throttle, socket };

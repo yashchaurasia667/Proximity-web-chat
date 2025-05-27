@@ -1,10 +1,7 @@
 import makeKaplayCtx from "./kaplayCtx";
 import Lobby from "./lobby";
-// import Member from "./player";
 
-import { Socket } from "socket.io-client";
-
-export default async function initGame(socket: Socket) {
+export default async function initGame() {
   const k = makeKaplayCtx();
   const SPEED = 150;
 
@@ -51,5 +48,5 @@ export default async function initGame(socket: Socket) {
   });
 
   // PLAYER & LOBBY
-  new Lobby(k, SPEED, socket, "player");
+  new Lobby(k, SPEED, "player");
 }

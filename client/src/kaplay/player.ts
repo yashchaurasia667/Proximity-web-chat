@@ -1,26 +1,22 @@
 import { GameObj, KAPLAYCtx, Vec2 } from "kaplay";
-import { Socket } from "socket.io-client";
-import { throttle } from "./utils";
+import { throttle, socket } from "./utils";
 
 export default class Member {
   public id: string;
   public pos: Vec2;
   private k: KAPLAYCtx;
   private player: GameObj;
-  private socket: Socket;
   private SPEED: number;
 
   constructor(
     id: string,
     k: KAPLAYCtx,
     speed: number,
-    socket: Socket,
     type: "player" | "remote",
     pos: Vec2
   ) {
     this.id = id;
     this.k = k;
-    this.socket = socket;
     this.SPEED = speed;
     this.pos = pos;
 
@@ -34,7 +30,7 @@ export default class Member {
       k.scale(2.5),
       k.anchor("center"),
       k.area({ shape: new k.Rect(k.vec2(0), 5, 10) }),
-      k.body(),
+      // k.body(),
       k.pos(posVec2),
       k.area(),
       "player",
@@ -51,9 +47,8 @@ export default class Member {
 
   private emitMovement() {
     console.log("emitting movement");
-    console.log(this.socket);
-    this.socket.emit("player_move", {
-      id: this.socket.id,
+    socket.emit("player_move", {
+      id: socket.id,
       pos: this.player.pos,
     });
   }

@@ -38,7 +38,8 @@ const socketStart = () => {
     });
 
     socket.on("player_move", (data) => {
-      // console.log(`id: ${data.id}, moved to: ${data.pos.x} ${data.pos.y}`);
+      console.log(`id: ${data.id}, moved to: ${data.pos.x} ${data.pos.y}`);
+      members.set(data.id, data.pos);
       io.emit("player_move", data);
     });
   });

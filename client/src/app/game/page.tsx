@@ -1,16 +1,25 @@
 "use client";
 
 import { useEffect } from "react";
-import { io } from "socket.io-client";
+import { socket } from "../../kaplay/utils";
 import initGame from "../../kaplay/initGame";
 
 import ControlKeys from "./ControlKeys";
 import Chat from "./Chat";
 
-const socket = io("http://localhost:9000");
 const Game = () => {
   useEffect(() => {
-    initGame(socket);
+    const handleConnect = () => {
+      console.log("Connected with socket ID:", socket.id);
+      initGame();
+    };
+
+    socket.on("connect", handleConnect);
+    if (socket.connected) handleConnect();
+
+    return () => {
+      socket.off("connect", handleConnect);
+    };
   }, []);
 
   return (
