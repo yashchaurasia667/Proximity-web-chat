@@ -3,9 +3,6 @@ import { KAPLAYCtx, Vec2 } from "kaplay";
 import Member from "./player";
 
 export default class Lobby {
-  // private lobby: { id: string; pos: Vec2; player: Member }[];
-
-  // {id: {pos, player}}
   private lobby = new Map<string, { pos: Vec2; player: Member }>();
   private k: KAPLAYCtx;
   private socket: Socket;
@@ -29,6 +26,25 @@ export default class Lobby {
 
     socket.on("player_left", (data) => {
       if (this.lobby.has(data.id)) this.removeMember(data.id);
+    });
+
+    socket.once("player_move", (data) => {
+      if (this.lobby.has(data.id))
+        this.lobby
+          .get(data.id)
+          ?.player.moveRemote(k.vec2(data.pos.x, data.pos.y));
+    });
+
+    socket.on("lobby", (data) => {
+      const rawLobby: Record<string, { x: number; y: number }> = data.lobby;
+
+      for (const [id, pos] of Object.entries(rawLobby)) {
+        if (this.lobby.has(id)) continue;
+
+        const vecPos = k.vec2(pos.x, pos.y);
+        const member = new Member(id, k, speed, socket, "remote", vecPos);
+        this.lobby.set(id, { pos: vecPos, player: member });
+      }
     });
   }
 

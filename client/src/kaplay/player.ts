@@ -1,5 +1,6 @@
 import { GameObj, KAPLAYCtx, Vec2 } from "kaplay";
 import { Socket } from "socket.io-client";
+import { throttle } from "./utils";
 
 export default class Member {
   public id: string;
@@ -49,25 +50,26 @@ export default class Member {
   }
 
   private emitMovement() {
-    console.log("emitting");
-    this.socket.emit("movement", this.player.pos);
+    console.log("emitting movement");
+    console.log(this.socket);
+    this.socket.emit("player_move", {
+      id: this.socket.id,
+      pos: this.player.pos,
+    });
   }
 
   private movePlayerKeyboard(key: string, anim: string, velocity: Vec2) {
     this.player.onKeyPress(key, () => {
       this.player.vel = velocity;
       this.player.play(anim);
-      setTimeout(() => {
-        this.emitMovement();
-      }, 100);
+      throttle(() => this.emitMovement(), 50);
     });
 
     this.player.onKeyRelease(key, () => {
       if (this.player.vel == velocity) {
         this.player.vel = this.k.vec2(0, 0);
         this.player.play(`${anim}-idle`);
-        // clearTimeout(500);
-        // this.emitMovement();
+        this.emitMovement();
       }
     });
   }
@@ -82,6 +84,7 @@ export default class Member {
       this.player.moveTo(clickPos.x, this.player.pos.y);
       this.player.moveTo(this.player.pos.x, clickPos.y);
     }
+    this.emitMovement();
   }
 
   private enableMovement() {

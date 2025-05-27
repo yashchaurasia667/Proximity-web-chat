@@ -18,6 +18,9 @@ const socketStart = () => {
       members.set(data.id, data.pos);
       io.emit("player_joined", data);
       console.log(`player joined, members size: ${members.size}`);
+
+      const lobbyObj = Object.fromEntries(members.entries());
+      io.emit("lobby", { lobby: lobbyObj });
     });
 
     socket.on("disconnect", () => {
@@ -26,8 +29,17 @@ const socketStart = () => {
       console.log(`player left, members size: ${members.size}`);
     });
 
+    socket.on("get_lobby", () => {
+      io.emit("lobby", { lobby: members });
+    });
+
     socket.on("chat_message", (data) => {
       io.emit("chat_message", data);
+    });
+
+    socket.on("player_move", (data) => {
+      // console.log(`id: ${data.id}, moved to: ${data.pos.x} ${data.pos.y}`);
+      io.emit("player_move", data);
     });
   });
 };
