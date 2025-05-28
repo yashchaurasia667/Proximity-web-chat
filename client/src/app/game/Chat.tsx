@@ -1,3 +1,6 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Socket } from "socket.io-client";
 
@@ -7,43 +10,56 @@ interface props {
 
 type message = {
   id: string;
+  name: string;
   message: string;
 };
 
 const Chat = ({ socket }: props) => {
   const [messages, setMessages] = useState<message[]>([]);
-  const [messageInput, setMessageInput] = useState<string>("");
-
+  const [messageInput, setMessageInput] = useState("");
   const messageBox = useRef<HTMLInputElement | null>(null);
+  const [name, setName] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     socket.on("player_joined", (data) => {
+      const getName = window.localStorage.getItem("name");
+      if (getName == null) router.push("/");
+      setName(getName!);
+
       setMessages([
         ...messages,
-        { id: data.id, message: "has joined the chat" },
+        { id: data.id, name: data.name, message: "has joined the chat" },
       ]);
     });
 
     socket.on("player_left", (data) => {
-      setMessages([...messages, { id: data.id, message: "has disconnected" }]);
+      setMessages([
+        ...messages,
+        { id: data.id, name: data.name, message: "has disconnected" },
+      ]);
     });
 
     socket.on("chat_message", (data) => {
       setMessages([...messages, data]);
     });
-  }, [messages, socket]);
+  }, [messages, socket, router, name]);
 
   const sendMessage = (e: FormEvent) => {
     e.preventDefault();
     if (messageInput) {
-      socket.emit("chat_message", { id: socket.id, message: messageInput });
+      socket.emit("chat_message", {
+        id: socket.id,
+        name: name,
+        message: messageInput,
+      });
       setMessageInput("");
     }
   };
 
   const messageLog = useMemo(() => {
     return messages.map((message, index) => (
-      <div key={index}>{`${message.id}: ${message.message}`}</div>
+      <div key={index}>{`${message.name}: ${message.message}`}</div>
     ));
   }, [messages]);
 

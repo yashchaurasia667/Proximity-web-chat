@@ -10,14 +10,14 @@ const socketStart = () => {
     },
   });
 
-  const members = new Map<string, pos>();
+  const members = new Map<string, { pos: pos; name: string }>();
 
   // triggeres when a user joins
   io.on("connection", (socket) => {
     socket.on("player_joined", (data) => {
-      members.set(data.id, data.pos);
+      members.set(data.id, { name: data.name, pos: data.pos });
       io.emit("player_joined", data);
-      console.log(`player joined, members size: ${members.size}`);
+      // console.log(`player joined, members size: ${members.size}`);
 
       const lobbyObj = Object.fromEntries(members.entries());
       io.emit("lobby", { lobby: lobbyObj });
@@ -26,7 +26,7 @@ const socketStart = () => {
     socket.on("disconnect", () => {
       members.delete(socket.id);
       io.emit("player_left", { id: socket.id });
-      console.log(`player left, members size: ${members.size}`);
+      // console.log(`player left, members size: ${members.size}`);
     });
 
     socket.on("get_lobby", () => {
@@ -39,7 +39,7 @@ const socketStart = () => {
 
     socket.on("player_move", (data) => {
       console.log(`id: ${data.id}, moved to: ${data.pos.x} ${data.pos.y}`);
-      members.set(data.id, data.pos);
+      members.set(data.id, { name: data.name, pos: data.pos });
       io.emit("player_move", data);
     });
   });

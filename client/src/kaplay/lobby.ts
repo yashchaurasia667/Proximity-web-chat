@@ -7,10 +7,12 @@ export default class Lobby {
   private lobby = new Map<string, { pos: Vec2; player: Member }>();
   private k: KAPLAYCtx;
   private SPEED: number;
+  private name;
 
   constructor(k: KAPLAYCtx, speed: number, type: "player" | "remote") {
     this.SPEED = speed;
     this.k = k;
+    this.name = window.localStorage.getItem("name");
     this.addMember(socket.id!, type);
 
     socket.on("player_joined", (data) => {
@@ -47,7 +49,7 @@ export default class Lobby {
     pos = pos ? pos : this.k.center();
     const player = new Member(id, this.k, this.SPEED, type, pos);
     this.lobby.set(player.id, { pos: player.pos, player });
-    socket.emit("player_joined", { id, pos });
+    socket.emit("player_joined", { id, name: this.name, pos });
   }
 
   private removeMember(id: string) {
