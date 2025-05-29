@@ -14,10 +14,11 @@ const Game = () => {
   useEffect(() => {
     const handleConnect = () => {
       const sprite = window.localStorage.getItem("sprite");
-      if (sprite == null) router.push("/");
+      const name = window.localStorage.getItem("name");
+      if (sprite == null || name == null) router.push("/");
 
       console.log("Connected with socket ID:", socket.id);
-      initGame(sprite!);
+      initGame(name!, sprite!);
     };
 
     socket.on("connect", handleConnect);

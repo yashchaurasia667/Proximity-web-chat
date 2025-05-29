@@ -10,12 +10,16 @@ const socketStart = () => {
     },
   });
 
-  const members = new Map<string, { pos: pos; name: string }>();
+  const members = new Map<string, { name: string; sprite: string; pos: pos }>();
 
   // triggeres when a user joins
   io.on("connection", (socket) => {
     socket.on("player_joined", (data) => {
-      members.set(data.id, { name: data.name, pos: data.pos });
+      members.set(data.id, {
+        name: data.name,
+        sprite: data.sprite,
+        pos: data.pos,
+      });
       io.emit("player_joined", data);
       // console.log(`player joined, members size: ${members.size}`);
 
@@ -39,7 +43,11 @@ const socketStart = () => {
 
     socket.on("player_move", (data) => {
       console.log(`id: ${data.id}, moved to: ${data.pos.x} ${data.pos.y}`);
-      members.set(data.id, { name: data.name, pos: data.pos });
+      members.set(data.id, {
+        name: data.name,
+        sprite: data.sprite,
+        pos: data.pos,
+      });
       io.emit("player_move", data);
     });
   });

@@ -4,6 +4,7 @@ import { throttle, socket } from "./utils";
 export default class Member {
   public id: string;
   public pos: Vec2;
+  private name: string;
   private k: KAPLAYCtx;
   private player: GameObj;
   private SPEED: number;
@@ -13,20 +14,31 @@ export default class Member {
     k: KAPLAYCtx,
     speed: number,
     type: "player" | "remote",
-    pos: Vec2
+    pos: Vec2,
+    name: string,
+    sprite: string
   ) {
     this.id = id;
     this.k = k;
     this.SPEED = speed;
     this.pos = pos;
+    this.name = name;
 
-    this.player = this.makePlayer(k, pos);
+    this.player = this.makePlayer(k, pos, sprite);
+    // k.onDraw("player", (character) => {
+    //   k.drawText({
+    //     text: this.name,
+    //     size: 24,
+    //     font: "pixelated",
+    //     color: k.rgb(0, 0, 0),
+    //   });
+    // });
     if (type == "player") this.enableMovement();
   }
 
-  private makePlayer(k: KAPLAYCtx, posVec2: Vec2) {
+  private makePlayer(k: KAPLAYCtx, posVec2: Vec2, sprite: string) {
     return k.add([
-      k.sprite("player", { anim: "walk-down-idle" }),
+      k.sprite(sprite, { anim: "walk-down-idle" }),
       k.scale(2.5),
       k.anchor("center"),
       k.area({ shape: new k.Rect(k.vec2(0), 5, 10) }),
