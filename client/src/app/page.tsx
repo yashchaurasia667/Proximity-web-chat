@@ -23,7 +23,10 @@ const Home = () => {
     if (!name) return;
 
     window.localStorage.setItem("name", name);
-    window.localStorage.setItem("sprite", characterUrls[urlIndex]);
+    window.localStorage.setItem(
+      "sprite",
+      characterUrls[urlIndex].split("/")[2]
+    );
     router.push("/game");
   };
 

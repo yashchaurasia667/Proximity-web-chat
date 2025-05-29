@@ -6,12 +6,18 @@ import initGame from "../../kaplay/initGame";
 
 import ControlKeys from "./ControlKeys";
 import Chat from "./Chat";
+import { useRouter } from "next/navigation";
 
 const Game = () => {
+  const router = useRouter();
+
   useEffect(() => {
     const handleConnect = () => {
+      const sprite = window.localStorage.getItem("sprite");
+      if (sprite == null) router.push("/");
+
       console.log("Connected with socket ID:", socket.id);
-      initGame();
+      initGame(sprite!);
     };
 
     socket.on("connect", handleConnect);
@@ -20,7 +26,7 @@ const Game = () => {
     return () => {
       socket.off("connect", handleConnect);
     };
-  }, []);
+  }, [router]);
 
   return (
     <>

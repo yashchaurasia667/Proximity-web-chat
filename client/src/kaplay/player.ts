@@ -56,17 +56,17 @@ export default class Member {
   private movePlayerKeyboard(key: string, anim: string, velocity: Vec2) {
     this.player.onKeyPress(key, () => {
       this.player.play(anim);
+      this.player.vel = velocity;
     });
 
     this.player.onKeyDown(key, () => {
-      this.player.vel = velocity;
-      this.player.move(velocity);
+      // this.player.move(this.player.vel);
       throttle(() => this.emitMovement(), 300)();
     });
 
     this.player.onKeyRelease(key, () => {
       if (this.player.vel == velocity) {
-        this.player.vel = this.k.vec2(0, 0);
+        this.player.vel = this.k.vec2(0);
         this.player.play(`${anim}-idle`);
         this.emitMovement();
       }
@@ -96,9 +96,9 @@ export default class Member {
     this.movePlayerKeyboard("d", "walk-right", this.k.vec2(this.SPEED, 0));
     this.movePlayerKeyboard("right", "walk-right", this.k.vec2(this.SPEED, 0));
 
-    // this.k.onUpdate(() => {
-    //   this.player.move(this.player.vel);
-    // });
+    this.k.onUpdate(() => {
+      this.player.move(this.player.vel);
+    });
 
     this.k.onClick("main_area", () => {
       const clickPos = this.k.mousePos();
