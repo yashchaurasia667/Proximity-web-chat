@@ -49,7 +49,7 @@ const Game = () => {
         </div>
         <div className="text-center mt-3">up, down, left, right</div>
       </div>
-      <Chat socket={socket} />
+      {/* <Chat socket={socket} /> */}
     </>
   );
 };

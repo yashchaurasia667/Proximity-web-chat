@@ -85,15 +85,35 @@ export default class Member {
     });
   }
 
+  // private moveMouseHelper(dist: number, animation: string) {
+  //   this.player.play(animation);
+  //   while(this.player.pos )
+  // }
+
   private movePlayerMouse(clickPos: Vec2) {
     const distance = clickPos.sub(this.player.pos);
+    const attrX =
+      distance.x < 0
+        ? { anim: "walk-left", vel: -200 }
+        : { anim: "walk-right", vel: 200 };
+    const attrY =
+      distance.y < 0
+        ? { anim: "walk-up", vel: -200 }
+        : { anim: "walk-down", vel: 200 };
+    this.k.debug.log(distance);
 
     if (Math.abs(distance.y) < Math.abs(distance.x)) {
-      this.player.moveTo(this.player.pos.x, clickPos.y);
-      this.player.moveTo(clickPos.x, this.player.pos.y);
+      this.player.play(attrY.anim);
+      this.player.vel = this.k.vec2(0, attrY.vel);
+      this.player.play(attrX.anim);
+      this.player.vel = this.k.vec2(0, attrX.vel);
+      // this.player.moveTo(this.player.pos.x, clickPos.y);
+      // this.player.moveTo(clickPos.x, this.player.pos.y);
     } else {
-      this.player.moveTo(clickPos.x, this.player.pos.y);
-      this.player.moveTo(this.player.pos.x, clickPos.y);
+      this.player.play(attrX.anim);
+      this.player.vel = this.k.vec2(0, attrX.vel);
+      this.player.play(attrY.anim);
+      this.player.vel = this.k.vec2(0, attrY.vel);
     }
     this.emitMovement();
   }
