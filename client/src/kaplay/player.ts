@@ -24,19 +24,25 @@ export default class Member {
     this.pos = pos;
     this.name = name;
 
-    this.player = this.makePlayer(k, pos, sprite);
-    // k.onDraw("player", (character) => {
-    //   k.drawText({
-    //     text: this.name,
-    //     size: 24,
-    //     font: "pixelated",
-    //     color: k.rgb(0, 0, 0),
-    //   });
-    // });
+    this.player = this.makePlayer(k, pos, sprite, type);
+    k.onDraw("player", () => {
+      k.drawText({
+        text: this.name,
+        size: 8,
+        font: "pixelated",
+        color: k.rgb(255, 255, 255),
+        pos: this.k.vec2(-3 * this.name.length, -20),
+      });
+    });
     if (type == "player") this.enableMovement();
   }
 
-  private makePlayer(k: KAPLAYCtx, posVec2: Vec2, sprite: string) {
+  private makePlayer(
+    k: KAPLAYCtx,
+    posVec2: Vec2,
+    sprite: string,
+    type: "player" | "remote"
+  ) {
     return k.add([
       k.sprite(sprite, { anim: "walk-down-idle" }),
       k.scale(2.5),
@@ -45,7 +51,8 @@ export default class Member {
       // k.body(),
       k.pos(posVec2),
       k.area(),
-      "player",
+      type,
+      // "player",
       {
         direction: k.vec2(0, 0),
         directionName: "walk-down",
@@ -87,40 +94,12 @@ export default class Member {
 
   private movePlayerMouse(clickPos: Vec2) {
     const distance = clickPos.sub(this.player.pos);
-    const attrX =
-      distance.x < 0
-        ? { anim: "walk-left", vel: -this.SPEED }
-        : { anim: "walk-right", vel: this.SPEED };
-    const attrY =
-      distance.y < 0
-        ? { anim: "walk-up", vel: -this.SPEED }
-        : { anim: "walk-down", vel: this.SPEED };
-    // this.k.debug.log(distance);
-
     if (Math.abs(distance.y) < Math.abs(distance.x)) {
-      this.player.play(attrY.anim);
-
-      // let counter = distance.y / attrY.vel;
-      let counter = 4 / 2;
-      this.k.debug.log(distance);
-      this.k.debug.log(this.SPEED);
-      this.k.debug.log(counter);
-      const ev = this.k.onUpdate(() => {
-        if (counter-- >= 0) {
-          // this.k.debug.log(counter);
-          this.player.move(0, attrY.vel);
-        } else ev.cancel();
-      });
-      // this.player.vel = this.k.vec2(0, attrY.vel);
-      // this.player.play(attrX.anim);
-      // this.player.vel = this.k.vec2(0, attrX.vel);
+      this.player.moveTo(this.player.pos.x, clickPos.y);
+      this.player.moveTo(clickPos.x, this.player.pos.y);
     } else {
       this.player.moveTo(clickPos.x, this.player.pos.y);
       this.player.moveTo(this.player.pos.x, clickPos.y);
-      // this.player.play(attrX.anim);
-      // this.player.vel = this.k.vec2(0, attrX.vel);
-      // this.player.play(attrY.anim);
-      // this.player.vel = this.k.vec2(0, attrY.vel);
     }
     this.emitMovement();
   }

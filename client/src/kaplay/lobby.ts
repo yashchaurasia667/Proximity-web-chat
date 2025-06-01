@@ -16,9 +16,11 @@ export default class Lobby {
     this.SPEED = speed;
     this.k = k;
     this.name = name;
+    this.k.debug.log(sprite);
     this.addMember(socket.id!, "player", this.name, sprite);
 
     socket.on("player_joined", (data) => {
+      this.k.debug.log(sprite);
       if (this.lobby.has(data.id)) return;
       this.addMember(
         data.id,
