@@ -16,11 +16,9 @@ export default class Lobby {
     this.SPEED = speed;
     this.k = k;
     this.name = name;
-    this.k.debug.log(sprite);
     this.addMember(socket.id!, "player", this.name, sprite);
 
     socket.on("player_joined", (data) => {
-      this.k.debug.log(sprite);
       if (this.lobby.has(data.id)) return;
       this.addMember(
         data.id,
@@ -36,14 +34,13 @@ export default class Lobby {
     });
 
     socket.on("player_move", (data) => {
-      // console.log(`id: ${data.id} has moved`);
       if (this.lobby.has(data.id))
         this.lobby
           .get(data.id)
           ?.player.moveRemote(k.vec2(data.pos.x, data.pos.y));
     });
 
-    socket.once("lobby", (data) => {
+    socket.on("lobby", (data) => {
       const rawLobby: Record<
         string,
         { name: string; sprite: string; pos: { x: number; y: number } }

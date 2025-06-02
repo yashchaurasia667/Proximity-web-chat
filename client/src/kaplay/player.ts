@@ -5,6 +5,7 @@ export default class Member {
   public id: string;
   public pos: Vec2;
   private name: string;
+  private sprite: string;
   private k: KAPLAYCtx;
   private player: GameObj;
   private SPEED: number;
@@ -23,12 +24,13 @@ export default class Member {
     this.SPEED = speed;
     this.pos = pos;
     this.name = name;
+    this.sprite = sprite;
 
-    this.player = this.makePlayer(k, pos, sprite, type);
-    k.onDraw("player", () => {
+    this.player = this.makePlayer(k, pos, sprite);
+    this.k.onDraw(this.id, () => {
       k.drawText({
         text: this.name,
-        size: 8,
+        size: 6,
         font: "pixelated",
         color: k.rgb(255, 255, 255),
         pos: this.k.vec2(-3 * this.name.length, -20),
@@ -37,22 +39,15 @@ export default class Member {
     if (type == "player") this.enableMovement();
   }
 
-  private makePlayer(
-    k: KAPLAYCtx,
-    posVec2: Vec2,
-    sprite: string,
-    type: "player" | "remote"
-  ) {
+  private makePlayer(k: KAPLAYCtx, posVec2: Vec2, sprite: string) {
     return k.add([
       k.sprite(sprite, { anim: "walk-down-idle" }),
       k.scale(2.5),
       k.anchor("center"),
       k.area({ shape: new k.Rect(k.vec2(0), 5, 10) }),
-      // k.body(),
       k.pos(posVec2),
       k.area(),
-      type,
-      // "player",
+      this.id,
       {
         direction: k.vec2(0, 0),
         directionName: "walk-down",
@@ -65,10 +60,11 @@ export default class Member {
   }
 
   private emitMovement() {
-    console.log("emitting movement");
     socket.emit("player_move", {
       id: socket.id,
       pos: this.player.pos,
+      name: this.name,
+      sprite: this.sprite,
     });
   }
 
