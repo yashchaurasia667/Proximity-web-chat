@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { socket } from "../../kaplay/utils";
+import { socket } from "../../utils";
 import initGame from "../../kaplay/initGame";
 
 import ControlKeys from "./ControlKeys";
@@ -49,7 +49,7 @@ const Game = () => {
         </div>
         <div className="text-center mt-3">up, down, left, right</div>
       </div>
-      {/* <Chat socket={socket} /> */}
+      <Chat socket={socket} />
     </>
   );
 };

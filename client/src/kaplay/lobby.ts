@@ -1,6 +1,6 @@
 import { KAPLAYCtx, Vec2 } from "kaplay";
 
-import { socket } from "./utils";
+import { socket } from "../utils";
 import Member from "./player";
 
 export default class Lobby {

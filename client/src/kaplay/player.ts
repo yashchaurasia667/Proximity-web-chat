@@ -1,5 +1,5 @@
 import { GameObj, KAPLAYCtx, Vec2 } from "kaplay";
-import { throttle, socket } from "./utils";
+import { throttle, socket } from "../utils";
 
 export default class Member {
   public id: string;

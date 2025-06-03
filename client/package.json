@@ -10,6 +10,7 @@
     "lint": "next lint --fix"
   },
   "dependencies": {
+    "firebase": "^11.8.1",
     "kaplay": "^3001.0.18",
     "next": "^15.3.2",
     "react": "^19.0.0",
