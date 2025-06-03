@@ -1,67 +1,91 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Socket } from "socket.io-client";
 
 interface props {
   socket: Socket;
 }
 
-type message = {
+type Message = {
   id: string;
   name: string;
   message: string;
 };
 
 const Chat = ({ socket }: props) => {
-  const [messages, setMessages] = useState<message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const messageBox = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState("");
   const router = useRouter();
 
   useEffect(() => {
-    socket.on("player_joined", (data) => {
-      const getName = window.localStorage.getItem("name");
-      if (getName == null) router.push("/");
-      setName(getName!);
+    const getName = window.localStorage.getItem("name");
+    if (getName == null) router.push("/");
+    setName(getName!);
 
-      setMessages([
-        ...messages,
-        { id: data.id, name: data.name, message: "has joined the chat" },
+    const handleJoin = (data: Message) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: data.id, name: data.name, message: " has joined the chat!" },
       ]);
-    });
+    };
 
-    socket.on("player_left", (data) => {
-      setMessages([
-        ...messages,
-        { id: data.id, name: data.name, message: "has disconnected" },
+    const handleLeave = (data: Message) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: data.id, name: data.name, message: " has disconnected..." },
       ]);
-    });
+    };
 
-    socket.on("chat_message", (data) => {
-      setMessages([...messages, data]);
-    });
-  }, [messages, socket, router, name]);
+    const handleMessage = (data: Message) => {
+      setMessages((prev) => [...prev, data]);
+    };
 
-  const sendMessage = (e: FormEvent) => {
-    e.preventDefault();
-    if (messageInput) {
-      socket.emit("chat_message", {
-        id: socket.id,
-        name: name,
-        message: messageInput,
-      });
-      setMessageInput("");
-    }
-  };
+    socket.on("player_joined", handleJoin);
+    socket.on("player_left", handleLeave);
+    socket.on("chat_message", handleMessage);
+
+    return () => {
+      socket.off("player_joined", handleJoin);
+      socket.off("player_left", handleLeave);
+      socket.off("chat_message", handleMessage);
+    };
+  }, [router, socket]);
+
+  const sendMessage = useCallback(
+    (e: FormEvent) => {
+      e.preventDefault();
+      if (messageInput.trim().length > 0) {
+        socket.emit("chat_message", {
+          id: socket.id,
+          name: name,
+          message: messageInput.trim(),
+        });
+        setMessageInput("");
+      }
+    },
+    [messageInput, name, socket]
+  );
 
   const messageLog = useMemo(() => {
-    return messages.map((message, index) => (
-      <div key={index}>{`${message.name}: ${message.message}`}</div>
+    return messages.map((msg, index) => (
+      <div key={index}>{`${msg.name}: ${msg.message}`}</div>
     ));
   }, [messages]);
+
+  // useEffect(() => {
+  //   messageBox.current?.scrollIntoView({ behavior: "smooth" });
+  // }, [messages]);
 
   return (
     <div className="absolute left-0 bottom-0 ml-2 mb-2 w-[400px]">

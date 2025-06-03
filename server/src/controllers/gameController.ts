@@ -1,28 +1,25 @@
-import { server } from "../global.d.js";
-import { Server } from "socket.io";
-import { pos } from "../types.js";
+import { Socket } from "socket.io";
+import { io } from "../global.d.js";
+
+import { PlayerData } from "../types.js";
 
 const socketStart = () => {
-  const io = new Server(server, {
-    cors: {
-      origin: "*", // Replace with actual frontend origin in production
-      credentials: true,
-    },
-  });
+  const members = new Map<string, Omit<PlayerData, "id">>();
 
-  const members = new Map<string, { name: string; sprite: string; pos: pos }>();
+  io.on("connection", (socket: Socket) => {
+    // triggeres when a user joins
+    socket.on("player_joined", (data: PlayerData) => {
+      if (!data?.id || !data?.name || !data?.sprite || !data?.pos) return;
 
-  // triggeres when a user joins
-  io.on("connection", (socket) => {
-    socket.on("player_joined", (data) => {
       members.set(data.id, {
         name: data.name,
         sprite: data.sprite,
         pos: data.pos,
       });
-      io.emit("player_joined", data);
+      // io.emit("player_joined", data);
+      socket.broadcast.emit("player_joined", data);
 
-      // to  update new player's lobby 
+      // to  update new player's lobby
       const lobbyObj = Object.fromEntries(members.entries());
       io.emit("lobby", { lobby: lobbyObj });
     });
@@ -33,20 +30,25 @@ const socketStart = () => {
     });
 
     socket.on("get_lobby", () => {
-      io.emit("lobby", { lobby: members });
+      const lobbyObj = Object.fromEntries(members.entries());
+      io.emit("lobby", { lobby: lobbyObj });
     });
 
     socket.on("chat_message", (data) => {
       io.emit("chat_message", data);
     });
 
-    socket.on("player_move", (data) => {
-      members.set(data.id, {
-        name: data.name,
-        sprite: data.sprite,
-        pos: data.pos,
-      });
-      io.emit("player_move", data);
+    socket.on("player_move", (data: PlayerData) => {
+      if (!data.id || !data.pos) return;
+
+      const existing = members.get(data.id);
+      if (existing) {
+        members.set(data.id, {
+          ...existing,
+          pos: data.pos,
+        });
+        socket.broadcast.emit("player_move", data);
+      }
     });
   });
 };
