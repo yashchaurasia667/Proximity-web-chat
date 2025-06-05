@@ -2,27 +2,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const VideoChat = () => {
-  const [elements, setElements] = useState<MediaDeviceInfo[]>([]);
-  const videoRef = useRef<HTMLVideoElement
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   async function openMediaDevices(constraints: MediaStreamConstraints) {
     return await navigator.mediaDevices.getUserMedia(constraints);
   }
 
   async function getConnectedDevices(type: string) {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    return devices.filter((device) => device.kind === type);
-  }
-
-  async function playVideoFromCamera() {
-    try {
-      const constraints = { video: true, audio: true };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      // const videoElement = document.querySelector("video#localVideo");
-      // videoElement.srcObject = stream;
-    } catch (error) {
-      console.error("Error opening video camera.", error);
-    }
+    const devices = (await navigator.mediaDevices.enumerateDevices()).filter(
+      (device) => device.kind == type
+    );
+    setDevices(devices);
+    return devices;
   }
 
   async function openCamera(
@@ -34,58 +26,50 @@ const VideoChat = () => {
       audio: { echoCancellation: true },
       video: {
         deviceId: cameraId,
-        width: { min: minWidth },
-        height: { min: minHeight },
+        width: minWidth,
+        height: minHeight,
       },
     };
-
     return await navigator.mediaDevices.getUserMedia(constraints);
   }
 
   useEffect(() => {
-    async function updateCameraList() {
-      const cameras = await getConnectedDevices("videoinput");
-      setElements(cameras);
-      if (cameras && cameras.length > 0) {
-        const stream = openCamera(cameras[0].deviceId, 1280, 720);
-      }
-    }
-
-    const handleDeviceChange = () => {
-      updateCameraList();
-    };
-
-    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
-
     (async () => {
       try {
-        const stream = await openMediaDevices({ video: true, audio: true });
-        console.log("Got mediaStream:", stream);
-        await updateCameraList();
+        openMediaDevices({ video: true, audio: true });
+        const cameras = await getConnectedDevices("videoinput");
+        if (cameras.length > 0) {
+          const stream = await openCamera(cameras[0].deviceId, 1280, 720);
+          if (videoRef.current) videoRef.current.srcObject = stream;
+        }
+
+        navigator.mediaDevices.addEventListener("devicechange", () => {
+          getConnectedDevices("videoinput");
+        });
       } catch (error) {
-        console.error(`Error accessing devices. ${error}`);
+        console.error("Something went wrong...", error);
       }
     })();
-
-    // Cleanup the event listener on unmount
-    return () => {
-      navigator.mediaDevices.removeEventListener(
-        "devicechange",
-        handleDeviceChange
-      );
-    };
   }, []);
 
   const cameras = useMemo(() => {
-    return elements.map((camera, index) => (
-      <div key={index}>{camera.label || "Unnamed Camera"}</div>
+    return devices.map((camera, index) => (
+      <option key={index}>{camera.label || "Unnamed Camera"}</option>
     ));
-  }, [elements]);
+  }, [devices]);
 
   return (
     <div>
       <h2>Available Camera Devices</h2>
       {cameras}
+      <video
+        ref={videoRef}
+        width={1280}
+        height={720}
+        autoPlay
+        playsInline
+        muted
+      />
     </div>
   );
 };
