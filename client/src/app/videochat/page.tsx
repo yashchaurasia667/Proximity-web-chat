@@ -7,6 +7,9 @@ const VideoChat = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null); // To stop previous stream
 
+  async function rtcCreateOffer() {
+  }
+
   async function getConnectedDevices(type: MediaDeviceKind) {
     const allDevices = await navigator.mediaDevices.enumerateDevices();
     const filtered = allDevices.filter((device) => device.kind === type);
