@@ -1,14 +1,14 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import { socket } from "../../utils";
 
 const VideoChat = () => {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null); // To stop previous stream
-
-  async function rtcCreateOffer() {
-  }
+  const peerConnection = useRef<RTCPeerConnection | null>(null);
 
   async function getConnectedDevices(type: MediaDeviceKind) {
     const allDevices = await navigator.mediaDevices.enumerateDevices();
@@ -38,6 +38,19 @@ const VideoChat = () => {
       videoRef.current.srcObject = stream;
     }
   }
+
+  useEffect(() => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    peerConnection.current = pc;
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        socket.emit("rtc_ice_candidate", {});
+      }
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {

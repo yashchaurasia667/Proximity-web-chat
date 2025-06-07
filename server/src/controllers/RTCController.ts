@@ -1,4 +1,4 @@
-import { io } from "../global.js";
+import { io } from "../global.d.js";
 
 io.on("connection", (socket) => {
   socket.on("rtc_offer", ({ targetId, offer }) => {
