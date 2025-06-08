@@ -15,25 +15,4 @@ const throttle = (callback: () => void, delay: number) => {
   };
 };
 
-const setupDevice = async () => {
-  console.log("Setup invoked");
-  try {
-    const stream: MediaStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
-    const localPlayer = document.getElementById(
-      "localVideo"
-    ) as HTMLVideoElement | null;
-
-    if (localPlayer) {
-      localPlayer.srcObject = stream;
-    } else {
-      console.log("localPlayer not found");
-    }
-  } catch (error) {
-    console.error("something went wrong", error);
-  }
-};
-
-export { throttle, socket, setupDevice };
+export { throttle, socket };

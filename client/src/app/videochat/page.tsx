@@ -1,66 +1,83 @@
 "use client";
+
 import React, { useEffect, useRef, useState } from "react";
 import { socket } from "../../utils";
 
 const VideoChat = () => {
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null); // To stop previous stream
-  const peerConnection = useRef<RTCPeerConnection | null>(null);
+  let didIoffer = false;
 
   async function getConnectedDevices(type: MediaDeviceKind) {
     const allDevices = await navigator.mediaDevices.enumerateDevices();
     const filtered = allDevices.filter((device) => device.kind === type);
-    setDevices(filtered);
     return filtered;
   }
 
-  async function openCamera(cameraId: string, width: number, height: number) {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-    }
-
+  async function openCamera(cameraId?: string) {
     const constraints = {
-      audio: { echoCancellation: true },
+      // audio: { echoCancellation: true },
       video: {
         deviceId: { exact: cameraId },
-        width,
-        height,
       },
     };
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    streamRef.current = stream;
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-    }
+    // if (localVideoRef.current) {
+    //   localVideoRef.current.srcObject = stream;
+    // }
+    return stream;
   }
 
-  useEffect(() => {
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    });
-    peerConnection.current = pc;
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        socket.emit("rtc_ice_candidate", {});
-      }
+  const createPeerConnection = async (offerObj) => {
+    const peerConfiguration = {
+      iceServers: [
+        {
+          urls: [
+            "stun:stun.l.google.com:19302",
+            "stun:stun1.l.google.com:19302",
+          ],
+        },
+      ],
     };
-  }, []);
+    const peerConnection = new RTCPeerConnection(peerConfiguration);
+    const remoteStream = new MediaStream();
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+    if (localStream) {
+      for (const track of localStream.getTracks())
+        peerConnection.addTrack(track, localStream);
+    }
+
+    peerConnection.addEventListener("signalingstatechange", (e) => {
+      console.log(e);
+      // console.log(peerConfiguration.);
+    });
+
+    peerConnection.addEventListener("icecandidate", (e) => {
+      console.log("..........ICE candidate found.............");
+      console.log(e);
+      if (e.candidate) {
+        socket.emit("send_ice_candidate_to_signaling_server", {
+          iceCandidate: e.candidate,
+        });
+      }
+    });
+  };
 
   useEffect(() => {
     (async () => {
       try {
-        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        const cams = await getConnectedDevices("videoinput");
-
-        if (cams.length > 0) {
-          setSelectedCameraId(cams[0].deviceId); // Default select first cam
+        const stream = await openCamera();
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          setLocalStream(stream);
         }
+
+        await createPeerConnection();
 
         navigator.mediaDevices.addEventListener("devicechange", () => {
           getConnectedDevices("videoinput");
@@ -71,40 +88,24 @@ const VideoChat = () => {
     })();
   }, []);
 
-  useEffect(() => {
-    if (selectedCameraId) {
-      openCamera(selectedCameraId, 1280, 720);
-    }
-  }, [selectedCameraId]);
-
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold">Select Camera</h2>
-      <form className="space-y-2">
-        {devices.map((device) => (
-          <label key={device.deviceId} className="block">
-            <input
-              type="radio"
-              name="camera"
-              value={device.deviceId}
-              checked={selectedCameraId === device.deviceId}
-              onChange={() => setSelectedCameraId(device.deviceId)}
-              className="mr-2"
-            />
-            {device.label || "Unnamed Camera"}
-          </label>
-        ))}
-      </form>
-
-      <video
-        ref={videoRef}
-        width={1280}
-        height={720}
-        autoPlay
-        playsInline
-        muted
-        className="border rounded"
-      />
+      <div className="flex gap-x-4">
+        {/* local stream */}
+        <video
+          ref={localVideoRef}
+          autoPlay
+          playsInline
+          className="border rounded"
+        />
+        {/* remote stream */}
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          className="border rounded"
+        />
+      </div>
     </div>
   );
 };

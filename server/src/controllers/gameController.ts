@@ -16,7 +16,6 @@ const socketStart = () => {
         sprite: data.sprite,
         pos: data.pos,
       });
-      // io.emit("player_joined", data);
       socket.broadcast.emit("player_joined", data);
 
       // to  update new player's lobby
