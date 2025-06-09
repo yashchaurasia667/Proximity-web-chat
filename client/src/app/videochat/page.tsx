@@ -7,8 +7,11 @@ const VideoChat = () => {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [peerConnection, setPeerConnection] =
+    useState<RTCPeerConnection | null>(null);
 
-  let didIoffer = false;
+  // let didIoffer = false;
 
   async function getConnectedDevices(type: MediaDeviceKind) {
     const allDevices = await navigator.mediaDevices.enumerateDevices();
@@ -31,7 +34,9 @@ const VideoChat = () => {
     return stream;
   }
 
-  const createPeerConnection = async (offerObj) => {
+  const createPeerConnection = async (
+    offerObj?: RTCLocalSessionDescriptionInit
+  ) => {
     const peerConfiguration = {
       iceServers: [
         {
@@ -42,22 +47,21 @@ const VideoChat = () => {
         },
       ],
     };
-    const peerConnection = new RTCPeerConnection(peerConfiguration);
-    const remoteStream = new MediaStream();
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
+    setPeerConnection(new RTCPeerConnection(peerConfiguration));
+    setRemoteStream(new MediaStream());
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+
     if (localStream) {
       for (const track of localStream.getTracks())
-        peerConnection.addTrack(track, localStream);
+        peerConnection?.addTrack(track, localStream);
     }
 
-    peerConnection.addEventListener("signalingstatechange", (e) => {
+    peerConnection?.addEventListener("signalingstatechange", (e) => {
       console.log(e);
       // console.log(peerConfiguration.);
     });
 
-    peerConnection.addEventListener("icecandidate", (e) => {
+    peerConnection?.addEventListener("icecandidate", (e) => {
       console.log("..........ICE candidate found.............");
       console.log(e);
       if (e.candidate) {
@@ -66,6 +70,20 @@ const VideoChat = () => {
         });
       }
     });
+
+    peerConnection?.addEventListener("track", (e) => {
+      console.log("Got a track from the other peer!! How excting");
+      console.log(e);
+      for (const tracks of e.streams[0].getTracks())
+        remoteStream?.addTrack(tracks);
+    });
+
+    if (offerObj) await peerConnection?.setLocalDescription(offerObj);
+  };
+
+  const addNewIceCandidate = (iceCandidate: RTCIceCandidate) => {
+    peerConnection?.addIceCandidate(iceCandidate);
+    console.log("======Added Ice Candidate======");
   };
 
   useEffect(() => {
