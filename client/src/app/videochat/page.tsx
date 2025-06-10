@@ -27,10 +27,8 @@ const VideoChat = () => {
       },
     };
 
+    // Requests user for permission to use video or audio device
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    // if (localVideoRef.current) {
-    //   localVideoRef.current.srcObject = stream;
-    // }
     return stream;
   }
 
@@ -47,6 +45,7 @@ const VideoChat = () => {
         },
       ],
     };
+
     setPeerConnection(new RTCPeerConnection(peerConfiguration));
     setRemoteStream(new MediaStream());
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
@@ -65,7 +64,8 @@ const VideoChat = () => {
       console.log("..........ICE candidate found.............");
       console.log(e);
       if (e.candidate) {
-        socket.emit("send_ice_candidate_to_signaling_server", {
+        // socket.emit("send_ice_candidate_to_signaling_server", {
+        socket.emit("rtc_ice_candidate", {
           iceCandidate: e.candidate,
         });
       }
@@ -96,6 +96,10 @@ const VideoChat = () => {
         }
 
         await createPeerConnection();
+        socket.emit("rtc_offer", {
+          targetId: socket.id,
+          offer: "hello this is an offer",
+        });
 
         navigator.mediaDevices.addEventListener("devicechange", () => {
           getConnectedDevices("videoinput");
