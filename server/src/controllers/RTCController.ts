@@ -1,5 +1,8 @@
 import { io } from "../global.d.js";
 
+const offers = [];
+const connectedSockets = [];
+
 const RTCStart = () => {
   io.on("connection", (socket) => {
     socket.on("rtc_offer", ({ targetId, offer }) => {

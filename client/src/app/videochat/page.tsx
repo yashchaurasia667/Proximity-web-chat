@@ -6,47 +6,43 @@ import { socket } from "../../utils";
 const VideoChat = () => {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [didIOffer, setDidIOffer] = useState(false);
+
   const [peerConnection, setPeerConnection] =
     useState<RTCPeerConnection | null>(null);
 
   // let didIoffer = false;
 
+  async function fetchMediaDevices() {
+    return navigator.mediaDevices.getUserMedia({
+      video: true,
+      // audio: { echoCancellation: true, noiseSuppression: true },
+    });
+  }
   async function getConnectedDevices(type: MediaDeviceKind) {
     const allDevices = await navigator.mediaDevices.enumerateDevices();
     const filtered = allDevices.filter((device) => device.kind === type);
     return filtered;
   }
 
-  async function openCamera(cameraId?: string) {
-    const constraints = {
-      // audio: { echoCancellation: true },
-      video: {
-        deviceId: { exact: cameraId },
-      },
-    };
-
-    // Requests user for permission to use video or audio device
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    return stream;
-  }
-
   const createPeerConnection = async (
     offerObj?: RTCLocalSessionDescriptionInit
   ) => {
-    const peerConfiguration = {
+    const peerConfig = {
       iceServers: [
         {
           urls: [
             "stun:stun.l.google.com:19302",
-            "stun:stun1.l.google.com:19302",
+            "stun:stun1.l.google.com:5349",
           ],
         },
       ],
     };
 
-    setPeerConnection(new RTCPeerConnection(peerConfiguration));
+    setPeerConnection(new RTCPeerConnection(peerConfig));
     setRemoteStream(new MediaStream());
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
 
@@ -55,18 +51,16 @@ const VideoChat = () => {
         peerConnection?.addTrack(track, localStream);
     }
 
-    peerConnection?.addEventListener("signalingstatechange", (e) => {
-      console.log(e);
-      // console.log(peerConfiguration.);
-    });
-
     peerConnection?.addEventListener("icecandidate", (e) => {
       console.log("..........ICE candidate found.............");
       console.log(e);
+
       if (e.candidate) {
         // socket.emit("send_ice_candidate_to_signaling_server", {
         socket.emit("rtc_ice_candidate", {
-          iceCandidate: e.candidate,
+          ICE: e.candidate,
+          username: socket.id,
+          didIOffer,
         });
       }
     });
@@ -74,6 +68,7 @@ const VideoChat = () => {
     peerConnection?.addEventListener("track", (e) => {
       console.log("Got a track from the other peer!! How excting");
       console.log(e);
+      
       for (const tracks of e.streams[0].getTracks())
         remoteStream?.addTrack(tracks);
     });
@@ -81,25 +76,20 @@ const VideoChat = () => {
     if (offerObj) await peerConnection?.setLocalDescription(offerObj);
   };
 
-  const addNewIceCandidate = (iceCandidate: RTCIceCandidate) => {
-    peerConnection?.addIceCandidate(iceCandidate);
-    console.log("======Added Ice Candidate======");
-  };
-
   useEffect(() => {
     (async () => {
       try {
-        const stream = await openCamera();
+        const stream = await fetchMediaDevices();
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
           setLocalStream(stream);
         }
 
         await createPeerConnection();
-        socket.emit("rtc_offer", {
-          targetId: socket.id,
-          offer: "hello this is an offer",
-        });
+        // socket.emit("rtc_offer", {
+        //   targetId: socket.id,
+        //   offer: "hello this is an offer",
+        // });
 
         navigator.mediaDevices.addEventListener("devicechange", () => {
           getConnectedDevices("videoinput");
