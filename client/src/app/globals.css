@@ -7,6 +7,9 @@
     font-family: "pixelated";
     src: url("/fonts/pixelated.TTF");
   }
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
 }
 
 :root {

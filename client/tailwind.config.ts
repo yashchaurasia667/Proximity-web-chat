@@ -18,16 +18,16 @@ export default {
         "elevated-hover": "#455abf",
 
         "text-base": "#d9bde1",
-        "subdued": "#a0a2b3",
+        subdued: "#a0a2b3",
 
         positive: "#a6a6d0",
         accent: "#7ec4cf",
-        negative: "#ed2c3f"
+        negative: "#ed2c3f",
       },
       fontFamily: {
-        "pixelated": ["pixelated"]
+        pixelated: ["pixelated"],
       },
-    }
+    },
   },
   plugins: [],
 } satisfies Config;
