@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { socket } from "../../utils";
 
 const VideoChat = () => {
@@ -8,10 +8,39 @@ const VideoChat = () => {
   const remoteRef = useRef<HTMLVideoElement>(null);
 
   const peerConnection = useRef<RTCPeerConnection>(null);
+  const [remoteOffer, setRemoteOffer] =
+    useState<RTCSessionDescriptionInit | null>(null);
+
+  useEffect(() => {
+    const handleOffer = (offers: RTCSessionDescriptionInit) => {
+      // console.log("Received offer from server:", offers);
+      if (offers !== null) setRemoteOffer(offers);
+    };
+
+    socket.on("offers", handleOffer);
+
+    return () => {
+      socket.off("offers", handleOffer);
+    };
+  }, []);
+
+  useEffect(() => {
+    socket.on("rtc_answer", async ({ answer }) => {
+      console.log("Received RTC answer");
+      if (peerConnection.current) {
+        await peerConnection.current.setRemoteDescription(
+          new RTCSessionDescription(answer)
+        );
+      }
+    });
+
+    return () => {
+      socket.off("rtc_answer");
+    };
+  }, []);
 
   useEffect(() => {
     const createOffer = async () => {
-      console.log(peerConnection);
       if (peerConnection.current) {
         const offer = await peerConnection.current.createOffer();
         await peerConnection.current.setLocalDescription(offer);
@@ -24,6 +53,7 @@ const VideoChat = () => {
         video: true,
         audio: { echoCancellation: true, noiseSuppression: true },
       });
+
       if (localRef.current) localRef.current.srcObject = stream;
 
       const peerConfiguration = {
@@ -41,14 +71,28 @@ const VideoChat = () => {
       for (const track of stream.getTracks())
         peerConnection.current.addTrack(track);
 
-      const offer = await createOffer();
-      socket.emit("rtc_offer", { offer });
+      if (remoteOffer) {
+        console.log("Remote offer present. Answering...");
+
+        await peerConnection.current.setRemoteDescription(
+          new RTCSessionDescription(remoteOffer)
+        );
+
+        const answer = await peerConnection.current.createAnswer();
+        await peerConnection.current.setLocalDescription(answer);
+
+        socket.emit("rtc_answer", {
+          answer,
+        });
+      } else {
+        console.log("No remote offer. Creating and sending one.");
+        const offer = await createOffer();
+        socket.emit("rtc_offer", { offer });
+      }
     };
 
-    (async () => {
-      await getUserMedia();
-    })();
-  }, []);
+    getUserMedia();
+  }, [remoteOffer]);
 
   return (
     <div className="px-4 py-6">
@@ -66,7 +110,13 @@ const VideoChat = () => {
         </div>
         <div>
           <p>Remote video</p>
-          <video ref={remoteRef} autoPlay muted playsInline />
+          <video
+            className="rotate-y-180"
+            ref={remoteRef}
+            autoPlay
+            muted
+            playsInline
+          />
         </div>
       </div>
     </div>

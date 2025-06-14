@@ -1,13 +1,22 @@
 import { io } from "../global.d.js";
 
+const offers: RTCSessionDescriptionInit[] = [];
+
 const RTCStart = () => {
   io.on("connection", (socket) => {
+    console.log(offers);
+    socket.broadcast.emit("offers", offers[0]);
+
     socket.on("rtc_offer", ({ offer }) => {
-      console.log(offer);
+      offers[0] = offer;
     });
 
-    socket.on("rtc_answer", ({ targetId, answer }) => {
-      io.to(targetId).emit("rtc_answer", {
+    socket.on("call_user", (data) => {
+      socket.broadcast.emit("incoming_call", { from: socket.id, data });
+    });
+
+    socket.on("rtc_answer", ({ answer }) => {
+      io.emit("rtc_answer", {
         senderId: socket.id,
         answer,
       });
