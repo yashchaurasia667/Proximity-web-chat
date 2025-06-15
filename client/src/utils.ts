@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:9000");
+const socket = io("https://localhost:9000");
 
 let wait = false;
 const throttle = (callback: () => void, delay: number) => {

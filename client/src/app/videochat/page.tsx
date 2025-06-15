@@ -13,7 +13,6 @@ const VideoChat = () => {
 
   useEffect(() => {
     const handleOffer = (offers: RTCSessionDescriptionInit) => {
-      // console.log("Received offer from server:", offers);
       if (offers !== null) setRemoteOffer(offers);
     };
 

@@ -1,12 +1,10 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 
 import { app, server } from "./global.d.js";
 import socketStart from "./controllers/gameController.js";
 import RTCStart from "./controllers/RTCController.js";
 
-dotenv.config();
 const PORT = process.env.PORT || 8000;
 
 app.disable("x-powered-by");
