@@ -1,191 +1,184 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { socket } from "../../utils";
 
 const VideoChat = () => {
-  const [joined, setJoined] = useState(false);
+  const localRef = useRef<HTMLVideoElement | null>(null);
+  const remoteRef = useRef<HTMLVideoElement | null>(null);
+
   const [type, setType] = useState<"offer" | "answer">("offer");
-  const [availableCalls, setAvailableCalls] = useState([]);
-  const [userName, setUserName] = useState("");
-
-  const localRef = useRef<HTMLVideoElement>(null);
-  const remoteRef = useRef<HTMLVideoElement>(null);
-
-  const peerConnection = useRef<RTCPeerConnection>(null);
-
-  const [offerData, setOfferData] = useState(null);
+  const [offer, setOffer] = useState<RTCSessionDescriptionInit | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [remoteOffer, setRemoteOffer] =
-    useState<RTCSessionDescriptionInit | null>(null);
+  const [availableOffers, setAvailableOffers] = useState<
+    { offer: RTCSessionDescriptionInit; id: string }[]
+  >([]);
 
-  const initCall = async (type: "offer" | "answer") => {
-    try {
-      // set localStream and GUM
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        // audio: {
-        //   echoCancellation: true,
-        //   noiseSuppression: true,
-        // },
-      });
+  const [peerConnection, setPeerConnection] =
+    useState<RTCPeerConnection | null>(null);
 
-      if (localRef.current) localRef.current.srcObject = stream;
-      console.log("LOCAL MEDIA ACCESS GRANTED");
-      setType(type);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const call = async (e) => {
-    initCall("offer");
-  };
-
-  const answer = async (callData) => {
-    initCall("answer");
-    setOfferData(callData);
-  };
-
+  // set localref and remoteref to streams
   useEffect(() => {
-    const setCalls = (data) => {
-      setAvailableCalls(data);
-      console.log(data);
+    if (localRef.current && remoteRef.current) {
+      localRef.current.srcObject = localStream;
+      remoteRef.current.srcObject = remoteStream;
+    }
+  }, [localStream, remoteStream]);
+
+  // socket listeners
+  useEffect(() => {
+    socket.on("rtc_offer", (data) => {
+      setAvailableOffers((prev) => [
+        ...prev,
+        { id: data.id, offer: data.offer },
+      ]);
+    });
+  }, []);
+
+  // create peer connection and add event listeners
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const createPeerConnection = async (offerObj?: any) => {
+      if (localStream && !peerConnection) {
+        const config = {
+          iceServers: [
+            {
+              urls: [
+                "stun:stun.google.com:19302",
+                "stun:stun1.l.google.com:5349",
+              ],
+            },
+          ],
+        };
+
+        console.log("Creating peer Connection");
+        const pc = new RTCPeerConnection(config);
+        for (const track of localStream.getTracks())
+          pc.addTrack(track, localStream);
+
+        pc.addEventListener("signalingstatechange", (e) => {
+          console.log("Signaling state changed");
+          console.log(e);
+          console.log(pc.signalingState);
+        });
+
+        pc.addEventListener("icecandidate", (e) => {
+          console.log("Got an ICE candidate!");
+
+          if (e.candidate) {
+            socket.emit("rtc_ice_candidate", {
+              iceCandidate: e.candidate,
+              didIOffer: type === "offer",
+            });
+          }
+        });
+
+        pc.addEventListener("track", (e) => {
+          if (remoteStream) {
+            console.log("Got remote stream!");
+
+            for (const track of e.streams[0].getTracks()) {
+              remoteStream.addTrack(track);
+              console.log("This should add some audio/video to remote feed");
+            }
+
+            if (remoteRef.current) remoteRef.current.srcObject = remoteStream;
+          }
+        });
+
+        if (offerObj) await pc.setRemoteDescription(offerObj.offer);
+
+        setPeerConnection(pc);
+      }
     };
 
-    setUserName(localStorage.getItem("name") || "");
-    socket.on("available_offers", setCalls);
-    socket.on("new_offer_waiting", setCalls);
-  }, [joined]);
+    if (!peerConnection && localStream) {
+      createPeerConnection();
+    }
+  }, [localStream, peerConnection, remoteStream, type]);
 
-  // we have media access now setup peerconnection w/listeners
+  // create offer
   useEffect(() => {
-    if (!peerConnection.current && remoteStream !== null) {
-      // create peerconnection
-      const peerConfiguration = {
-        iceServers: [
-          {
-            urls: [
-              "stun:stun.google.com:19302",
-              "stun:stun1.l.google.com:5349",
-            ],
-          },
-        ],
+    if (!offer && peerConnection) {
+      const createOffer = async () => {
+        try {
+          const offer = await peerConnection?.createOffer();
+          await peerConnection?.setLocalDescription(offer);
+          if (offer) setOffer(offer);
+          setType("offer");
+          socket.emit("rtc_offer", { offer });
+        } catch (error) {
+          console.error(error);
+        }
       };
 
-      peerConnection.current = new RTCPeerConnection(peerConfiguration);
-      setRemoteStream(new MediaStream());
-      if (remoteRef.current) remoteRef.current.srcObject = remoteStream;
-
-      peerConnection.current.addEventListener("signalingstatechange", (e) => {
-        console.log("signaling event change");
-        console.log(e);
-        console.log(peerConnection.current?.signalingState);
-      });
-
-      peerConnection.current.addEventListener("icecandidate", (e) => {
-        console.log("Foung an ICE candidate");
-        if (e.candidate) {
-          socket.emit("send_ice_candidate_to_signaling_server", {
-            iceCandidate: e.candidate,
-            iceUserName: userName,
-            didIOffer: type === "offer",
-          });
-        }
-      });
-
-      peerConnection.current.addEventListener("track", (e) => {
-        // the remote has sent us a track
-        for (const track of e.streams[0].getTracks()) {
-          remoteStream.addTrack(track);
-          console.log("This should add some audio/video to remote feed");
-        }
-      });
+      createOffer();
     }
-  }, [remoteStream]);
+  }, [offer, peerConnection]);
 
-  // we know what kind of client this is and have a peer connection
-  useEffect(() => {
-    if (type && peerConnection.current) {
-      socket.on("answer_response", (offerObj) => {
-        console.log(offerObj);
-        const answer = offerObj.answer;
-      });
-
-      socket.on("received_ice_candidate_from_server", (iceC) => {
-        peerConnection.current?.addIceCandidate(iceC);
-        console.log(iceC);
-        console.log("Added an iceCandidate to existing page presence");
-      });
-    }
-  }, [type]);
-
-  useEffect(() => {
-    const handleOffer = (offers: RTCSessionDescriptionInit) => {
-      if (offers !== null) setRemoteOffer(offers);
+  // enable user media and set streams
+  const initCall = async () => {
+    const constraints = {
+      video: true,
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
     };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    setLocalStream(stream);
 
-    socket.on("offers", handleOffer);
+    setRemoteStream(new MediaStream());
+  };
 
-    return () => {
-      socket.off("offers", handleOffer);
-    };
-  }, []);
-
-  useEffect(() => {
-    socket.on("rtc_answer", async ({ answer }) => {
-      console.log("Received RTC answer");
-      if (peerConnection.current) {
-        await peerConnection.current.setRemoteDescription(
-          new RTCSessionDescription(answer)
-        );
-      }
-    });
-
-    return () => {
-      socket.off("rtc_answer");
-    };
-  }, []);
+  const call = async () => {
+    await initCall();
+    // await createPeerConnection();
+  };
 
   return (
-    <div className="px-4 py-6">
-      <h1 className="font-bold text-2xl">video chat</h1>
-      <div className="mt-4 mb-2">
+    <div className="p-4">
+      <div>Video Chat</div>
+      <div className="my-4">
         <button
-          className="bg-blue-700 px-6 py-2 rounded-md font-semibold"
+          className="font-semibold text-lg bg-blue-700 rounded-md px-6 py-2"
           onClick={call}
         >
           Call
         </button>
-        <div className="available-calls flex gap-x-3 items-center mt-3 text-lg font-medium">
-          <p>available calls: </p>
-          {availableCalls.map((callData, index) => (
-            <button
-              key={index}
-              className="bg-blue-700 px-6 py-2 rounded-md font-semibold"
-              onClick={() => answer(callData)}
-            >
-              {callData.offererUserName}
-            </button>
-          ))}
+
+        <div className="my-4 flex gap-x-3 items-center">
+          <p>Available Offers: </p>
+          <div>
+            {availableOffers.map((offer, index) => (
+              <button
+                key={index}
+                className="bg-green-600 rounded-md px-6 py-2 font-semibold text-lg mx-1"
+              >
+                {offer.id}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-      <div className="flex gap-x-4 ">
+
+      <div className="flex gap-x-4">
         <div>
-          <p>Local video</p>
+          <p className="text-lg">local video</p>
           <video
-            className="rotate-y-180"
             ref={localRef}
+            className="rotate-y-180"
             autoPlay
             muted
             playsInline
           />
         </div>
         <div>
-          <p>Remote video</p>
+          <p className="text-lg">remote video</p>
           <video
-            className="rotate-y-180"
             ref={remoteRef}
+            className="rotate-y-180"
             autoPlay
             muted
             playsInline
