@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { socket } from "../../utils";
 
 const VideoChat = () => {
@@ -11,35 +11,22 @@ const VideoChat = () => {
   const [offer, setOffer] = useState<RTCSessionDescriptionInit | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
   const [availableOffers, setAvailableOffers] = useState<
-    { offer: RTCSessionDescriptionInit; id: string }[]
+    { id: string; offer: RTCSessionDescriptionInit }[]
   >([]);
+
+  const [offerToAnswer, setOfferToAnswer] = useState<{
+    id: string;
+    offer: RTCSessionDescriptionInit;
+  } | null>(null);
 
   const [peerConnection, setPeerConnection] =
     useState<RTCPeerConnection | null>(null);
 
-  // set localref and remoteref to streams
-  useEffect(() => {
-    if (localRef.current && remoteRef.current) {
-      localRef.current.srcObject = localStream;
-      remoteRef.current.srcObject = remoteStream;
-    }
-  }, [localStream, remoteStream]);
-
-  // socket listeners
-  useEffect(() => {
-    socket.on("rtc_offer", (data) => {
-      setAvailableOffers((prev) => [
-        ...prev,
-        { id: data.id, offer: data.offer },
-      ]);
-    });
-  }, []);
-
-  // create peer connection and add event listeners
-  useEffect(() => {
+  const createPeerConnection = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const createPeerConnection = async (offerObj?: any) => {
+    async (offerObj?: any) => {
       if (localStream && !peerConnection) {
         const config = {
           iceServers: [
@@ -57,9 +44,9 @@ const VideoChat = () => {
         for (const track of localStream.getTracks())
           pc.addTrack(track, localStream);
 
-        pc.addEventListener("signalingstatechange", (e) => {
+        pc.addEventListener("signalingstatechange", () => {
           console.log("Signaling state changed");
-          console.log(e);
+          // console.log(e);
           console.log(pc.signalingState);
         });
 
@@ -91,12 +78,49 @@ const VideoChat = () => {
 
         setPeerConnection(pc);
       }
-    };
+    },
+    [localStream, peerConnection, remoteStream, type]
+  );
 
+  // set localref and remoteref to streams
+  useEffect(() => {
+    if (localRef.current && remoteRef.current) {
+      localRef.current.srcObject = localStream;
+      remoteRef.current.srcObject = remoteStream;
+    }
+  }, [localStream, remoteStream]);
+
+  // socket listeners
+  useEffect(() => {
+    socket.on(
+      "rtc_offer",
+      (data: { offer: Record<string, RTCSessionDescriptionInit> }) => {
+        // const rawOffers: Record<string, RTCSessionDescriptionInit> = data.offer;
+        const offersArray = Object.entries(data.offer).map(([id, offer]) => ({
+          id,
+          offer,
+        }));
+        setAvailableOffers(offersArray);
+      }
+    );
+
+    socket.on("rtc_ice_candidates", (data) => {
+      console.log("adding ice candidates");
+      peerConnection?.addIceCandidate(data.iceCandidate);
+    });
+
+    socket.on("rtc_answer", async (data) => {
+      if (!peerConnection) await createPeerConnection();
+      peerConnection?.setRemoteDescription(data.answer);
+    });
+  }, [createPeerConnection, peerConnection]);
+
+  // create peer connection and add event listeners
+  useEffect(() => {
     if (!peerConnection && localStream) {
       createPeerConnection();
     }
-  }, [localStream, peerConnection, remoteStream, type]);
+  }, [createPeerConnection, localStream, peerConnection]);
 
   // create offer
   useEffect(() => {
@@ -107,7 +131,7 @@ const VideoChat = () => {
           await peerConnection?.setLocalDescription(offer);
           if (offer) setOffer(offer);
           setType("offer");
-          socket.emit("rtc_offer", { offer });
+          socket.emit("rtc_offer", { id: socket.id, offer });
         } catch (error) {
           console.error(error);
         }
@@ -116,6 +140,26 @@ const VideoChat = () => {
       createOffer();
     }
   }, [offer, peerConnection]);
+
+  // answer an offer
+  useEffect(() => {
+    const answerRemoteOffer = async () => {
+      if (offerToAnswer && peerConnection) {
+        await peerConnection.setRemoteDescription(
+          new RTCSessionDescription(offerToAnswer.offer)
+        );
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+
+        socket.emit("rtc_answer", {
+          id: socket.id,
+          targetId: offerToAnswer.id,
+          answer,
+        });
+      }
+    };
+    answerRemoteOffer();
+  }, [offerToAnswer, peerConnection]);
 
   // enable user media and set streams
   const initCall = async () => {
@@ -134,7 +178,6 @@ const VideoChat = () => {
 
   const call = async () => {
     await initCall();
-    // await createPeerConnection();
   };
 
   return (
@@ -153,6 +196,9 @@ const VideoChat = () => {
           <div>
             {availableOffers.map((offer, index) => (
               <button
+                onClick={() => {
+                  setOfferToAnswer({ ...offer });
+                }}
                 key={index}
                 className="bg-green-600 rounded-md px-6 py-2 font-semibold text-lg mx-1"
               >
