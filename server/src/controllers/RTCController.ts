@@ -1,14 +1,19 @@
 import { io } from "../global.d.js";
+
 const RTCStart = () => {
-  // const offers: RTCSessionDescriptionInit[] = [];
-  const offers = new Map<string, RTCSessionDescriptionInit>();
+  // id: {offer, ice candidates[], answer_id, answer, answerer_ice_candidates}
+  const offers = new Map<
+    string,
+    {
+      offer: RTCSessionDescriptionInit;
+      offererICECandidates: RTCIceCandidate[];
+      answererId: string | null;
+      answer: RTCSessionDescriptionInit | null;
+      answererICECandidate: RTCIceCandidate[];
+    }
+  >();
 
-  const emitOffers = (data?: {
-    id: string;
-    offer: RTCSessionDescriptionInit;
-  }) => {
-    if (data) offers.set(data.id, data.offer);
-
+  const emitOffers = () => {
     const offerObj = Object.fromEntries(offers.entries());
     return offerObj;
   };
@@ -16,17 +21,59 @@ const RTCStart = () => {
   io.on("connection", (socket) => {
     // console.log(`User connected: ${socket.id}`);
     if (offers.size > 0) {
-      console.log("emitting offers on connection");
       socket.to(socket.id).emit("rtc_offer", emitOffers());
     }
 
     socket.on("rtc_offer", (data) => {
-      const offerObj = emitOffers(data);
-      socket.broadcast.emit("rtc_offer", { offer: offerObj });
+      if (offers.has(data.id)) {
+        const prevOffer = offers.get(data.id);
+        prevOffer!.offer = data.offer;
+        offers.set(data.id, prevOffer!);
+      } else {
+        offers.set(data.id, {
+          offer: data.offer,
+          offererICECandidates: [],
+          answererId: null,
+          answer: null,
+          answererICECandidate: [],
+        });
+      }
+      socket.broadcast.emit("rtc_offer", { offer: emitOffers() });
     });
 
     socket.on("rtc_ice_candidate", (data) => {
-      socket.broadcast.emit("rtc_ice_candidate", data);
+      // if (offers.has(data.id)) {
+      //   const prevOffer = offers.get(data.id);
+      //   prevOffer!.offererICECandidates.push(data.iceCandidate);
+      //   offers.set(data.id, prevOffer!);
+      // }
+      // socket.broadcast.emit("rtc_ice_candidate", data);
+
+      if (data.didIOffer) {
+        if (offers.has(data.id)) {
+          const offer = offers.get(data.id);
+          offer!.offererICECandidates.push(data.iceCandidate);
+          offers.set(data.id, offer!);
+
+          if (offer?.answererId) {
+            socket
+              .to(offer.answererId)
+              .emit("rtc_ice_candidate", { iceCandidate: data.iceCandidate });
+          }
+          // else {
+          //   console.log(
+          //     "Got ice candidate but no answerer, saved it to the object"
+          //   );
+          // }
+        }
+      } else {
+        const offer = offers.get(data.targetId);
+        if (offer) {
+          offer.answererId = socket.id;
+          offer.answererICECandidate.push(data.iceCandidate);
+          offers.set(data.targetId, offer);
+        }
+      }
     });
 
     socket.on("rtc_answer", (data) => {

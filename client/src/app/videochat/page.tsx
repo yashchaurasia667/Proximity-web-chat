@@ -3,6 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { socket } from "../../utils";
 
+type OfferEntry = {
+  id: string;
+  offer: RTCSessionDescriptionInit;
+  offererICECandidates: RTCIceCandidate[];
+  answererId: string | null;
+  answer: RTCSessionDescriptionInit | null;
+  answererICECandidate: RTCIceCandidate[];
+};
+
 const VideoChat = () => {
   const localRef = useRef<HTMLVideoElement | null>(null);
   const remoteRef = useRef<HTMLVideoElement | null>(null);
@@ -12,14 +21,9 @@ const VideoChat = () => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
-  const [availableOffers, setAvailableOffers] = useState<
-    { id: string; offer: RTCSessionDescriptionInit }[]
-  >([]);
+  const [availableOffers, setAvailableOffers] = useState<OfferEntry[]>([]);
 
-  const [offerToAnswer, setOfferToAnswer] = useState<{
-    id: string;
-    offer: RTCSessionDescriptionInit;
-  } | null>(null);
+  const [offerToAnswer, setOfferToAnswer] = useState<OfferEntry | null>(null);
 
   const [peerConnection, setPeerConnection] =
     useState<RTCPeerConnection | null>(null);
@@ -58,6 +62,7 @@ const VideoChat = () => {
               iceCandidate: e.candidate,
               id: socket.id,
               didIOffer: type === "offer",
+              targetId: offerToAnswer?.id,
             });
           }
         });
@@ -80,7 +85,7 @@ const VideoChat = () => {
         setPeerConnection(pc);
       }
     },
-    [localStream, peerConnection, remoteStream, type]
+    [localStream, offerToAnswer?.id, peerConnection, remoteStream, type]
   );
 
   // set localref and remoteref to streams
@@ -95,13 +100,21 @@ const VideoChat = () => {
   useEffect(() => {
     socket.on(
       "rtc_offer",
-      (data: { offer: Record<string, RTCSessionDescriptionInit> }) => {
+      (data: { offer: Record<string, Omit<OfferEntry, "id">> }) => {
         if (data.offer) {
-          const offersArray = Object.entries(data.offer).map(([id, offer]) => ({
-            id,
-            offer,
-          }));
+          const offersArray = Object.entries(data.offer).map(
+            ([id, offerData]) => ({
+              id,
+              offer: offerData.offer,
+              offererICECandidates: offerData.offererICECandidates,
+              answererId: offerData.answererId,
+              answer: offerData.answer,
+              answererICECandidate: offerData.answererICECandidate,
+            })
+          );
           setAvailableOffers(offersArray);
+        } else {
+          setAvailableOffers([]);
         }
       }
     );
@@ -129,15 +142,15 @@ const VideoChat = () => {
 
   // create offer
   useEffect(() => {
-    if (!offer && peerConnection) {
+    if (!offer && peerConnection && !offerToAnswer) {
       const createOffer = async () => {
         try {
           if (!offerToAnswer) {
+            setType("offer");
             const offer = await peerConnection?.createOffer();
             await peerConnection?.setLocalDescription(offer);
-            if (offer) setOffer(offer);
-            setType("offer");
             setOffer(offer);
+
             socket.emit("rtc_offer", { id: socket.id, offer });
           }
         } catch (error) {
@@ -152,7 +165,7 @@ const VideoChat = () => {
   // answer an offer
   useEffect(() => {
     const answerRemoteOffer = async () => {
-      if (offerToAnswer) {
+      if (offerToAnswer && type == "answer") {
         console.log("creating an answer");
 
         if (peerConnection) {
@@ -175,7 +188,7 @@ const VideoChat = () => {
     };
 
     answerRemoteOffer();
-  }, [createPeerConnection, offerToAnswer, peerConnection]);
+  }, [createPeerConnection, offerToAnswer, peerConnection, type]);
 
   // enable user media and set streams
   const initCall = async () => {
@@ -213,6 +226,7 @@ const VideoChat = () => {
             {availableOffers.map((offer, index) => (
               <button
                 onClick={() => {
+                  setType("answer");
                   setOfferToAnswer({ ...offer });
                 }}
                 key={index}
