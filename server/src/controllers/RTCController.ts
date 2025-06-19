@@ -1,7 +1,7 @@
 import { io } from "../global.d.js";
 
 const RTCStart = () => {
-  // id: {offer, ice candidates[], answer_id, answer, answerer_ice_candidates}
+  // offerer_id: {offer, ice candidates[], answer_id, answer, answerer_ice_candidates}
   const offers = new Map<
     string,
     {
@@ -25,59 +25,57 @@ const RTCStart = () => {
     }
 
     socket.on("rtc_offer", (data) => {
-      if (offers.has(data.id)) {
-        const prevOffer = offers.get(data.id);
-        prevOffer!.offer = data.offer;
-        offers.set(data.id, prevOffer!);
-      } else {
-        offers.set(data.id, {
-          offer: data.offer,
-          offererICECandidates: [],
-          answererId: null,
-          answer: null,
-          answererICECandidate: [],
-        });
-      }
+      offers.set(data.id, {
+        offer: data.offer,
+        offererICECandidates: [],
+        answererId: null,
+        answer: null,
+        answererICECandidate: [],
+      });
       socket.broadcast.emit("rtc_offer", { offer: emitOffers() });
     });
 
     socket.on("rtc_ice_candidate", (data) => {
-      // if (offers.has(data.id)) {
-      //   const prevOffer = offers.get(data.id);
-      //   prevOffer!.offererICECandidates.push(data.iceCandidate);
-      //   offers.set(data.id, prevOffer!);
-      // }
-      // socket.broadcast.emit("rtc_ice_candidate", data);
+      // data: {iceCandidate, id, didIoffer, targetId?}
 
-      if (data.didIOffer) {
-        if (offers.has(data.id)) {
-          const offer = offers.get(data.id);
-          offer!.offererICECandidates.push(data.iceCandidate);
-          offers.set(data.id, offer!);
+      // if candidates are coming from the offerer
+      if (data.didIoffer) {
+        const offer = offers.get(data.id);
+        if (offer) {
+          // store the candidates into the array and send when the offer is answered
+          console.log("Offer found for offerer's ice candidate");
+          offer.offererICECandidates.push(data.iceCandidate);
+          offers.set(data.id, offer);
 
-          if (offer?.answererId) {
-            socket
-              .to(offer.answererId)
-              .emit("rtc_ice_candidate", { iceCandidate: data.iceCandidate });
+          // if the offer has been answered, pass through the ice candidates
+          if (offer.answererId) {
+            socket.to(offer.answererId).emit("rtc_ice_candidate", data);
           }
-          // else {
-          //   console.log(
-          //     "Got ice candidate but no answerer, saved it to the object"
-          //   );
-          // }
         }
       } else {
         const offer = offers.get(data.targetId);
         if (offer) {
-          offer.answererId = socket.id;
+          console.log("Offer found for offerer's ice candidate");
           offer.answererICECandidate.push(data.iceCandidate);
           offers.set(data.targetId, offer);
+          socket.to(data.targetId).emit("rtc_ice_candidate", data);
         }
       }
     });
 
     socket.on("rtc_answer", (data) => {
-      socket.to(data.targetId).emit("rtc_answer", data);
+      const offer = offers.get(data.targetId);
+      if (offer) {
+        offer.answer = data.answer;
+        offers.set(data.targetId, offer);
+        socket
+          .to(data.targetId)
+          .emit("rtc_answer", {
+            id: offer.answererId,
+            answer: offer.answer,
+            answererICECandidates: offer.answererICECandidate,
+          });
+      }
     });
 
     socket.on("disconnect", () => {

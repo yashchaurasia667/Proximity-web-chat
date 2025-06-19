@@ -125,34 +125,39 @@ const VideoChat = () => {
     });
 
     socket.on("rtc_answer", async (data) => {
-      if (!peerConnection) {
-        await createPeerConnection(data.answer);
-      } else {
-        peerConnection?.setRemoteDescription(data.answer);
+      if (peerConnection) {
+        if (data.answererICECandidates) {
+          console.log("Got answerer's ice candidates");
+          for (const ice of data.answererICECandidates) {
+            peerConnection.addIceCandidate(ice);
+          }
+        }
+
+        peerConnection.setRemoteDescription(
+          new RTCSessionDescription(data.answer)
+        );
       }
     });
   }, [createPeerConnection, peerConnection]);
 
-  // create peer connection and add event listeners
+  // 2. create peer connection and add event listeners
   useEffect(() => {
     if (!peerConnection && localStream) {
       createPeerConnection();
     }
   }, [createPeerConnection, localStream, peerConnection]);
 
-  // create offer
+  // 3. create offer
   useEffect(() => {
     if (!offer && peerConnection && !offerToAnswer) {
+      setType("offer");
       const createOffer = async () => {
         try {
-          if (!offerToAnswer) {
-            setType("offer");
-            const offer = await peerConnection?.createOffer();
-            await peerConnection?.setLocalDescription(offer);
-            setOffer(offer);
+          const offer = await peerConnection?.createOffer();
+          await peerConnection?.setLocalDescription(offer);
+          setOffer(offer);
 
-            socket.emit("rtc_offer", { id: socket.id, offer });
-          }
+          socket.emit("rtc_offer", { id: socket.id, offer });
         } catch (error) {
           console.error(error);
         }
@@ -162,16 +167,21 @@ const VideoChat = () => {
     }
   }, [offer, offerToAnswer, peerConnection]);
 
-  // answer an offer
+  // 2. answer an offer
   useEffect(() => {
     const answerRemoteOffer = async () => {
       if (offerToAnswer && type == "answer") {
-        console.log("creating an answer");
-
         if (peerConnection) {
+          console.log("creating an answer");
+          // console.log("adding offerer's ice candidates");
+          // for (const ice of offerToAnswer.offererICECandidates) {
+          //   peerConnection.addIceCandidate(ice);
+          // }
+
           await peerConnection.setRemoteDescription(
             new RTCSessionDescription(offerToAnswer.offer)
           );
+
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
 
@@ -190,7 +200,7 @@ const VideoChat = () => {
     answerRemoteOffer();
   }, [createPeerConnection, offerToAnswer, peerConnection, type]);
 
-  // enable user media and set streams
+  // 1. enable user media and set streams
   const initCall = async () => {
     const constraints = {
       video: true,
@@ -201,12 +211,18 @@ const VideoChat = () => {
     };
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     setLocalStream(stream);
-
     setRemoteStream(new MediaStream());
   };
 
   const call = async () => {
     await initCall();
+  };
+
+  // 1. initiate answer call
+  const answer = async (offer: OfferEntry) => {
+    console.log("setting offer to answer");
+    setType("answer");
+    setOfferToAnswer({ ...offer });
   };
 
   return (
@@ -225,10 +241,7 @@ const VideoChat = () => {
           <div>
             {availableOffers.map((offer, index) => (
               <button
-                onClick={() => {
-                  setType("answer");
-                  setOfferToAnswer({ ...offer });
-                }}
+                onClick={() => answer(offer)}
                 key={index}
                 className="bg-green-600 rounded-md px-6 py-2 font-semibold text-lg mx-1"
               >
