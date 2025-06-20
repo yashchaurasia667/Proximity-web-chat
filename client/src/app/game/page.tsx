@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 import { socket } from "../../utils";
 import initGame from "../../kaplay/initGame";
 
-import ControlKeys from "./ControlKeys";
 import Chat from "./Chat";
-import { useRouter } from "next/navigation";
+import ControlKeys from "./ControlKeys";
+import ControlBar from "./ControlBar";
 
 const Game = () => {
   const router = useRouter();
@@ -49,6 +51,9 @@ const Game = () => {
         </div>
         <div className="text-center mt-3">up, down, left, right</div>
       </div>
+
+      <ControlBar mic={false} camera={false} />
+
       <Chat socket={socket} />
     </>
   );

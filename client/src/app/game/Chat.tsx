@@ -24,8 +24,12 @@ type Message = {
 const Chat = ({ socket }: props) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState("");
-  const messageBox = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState("");
+  const [isHovering, setIsHovering] = useState(false);
+  const [isActive, setIsActive] = useState(false);
+
+  const messageBox = useRef<HTMLInputElement | null>(null);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -88,8 +92,26 @@ const Chat = ({ socket }: props) => {
   // }, [messages]);
 
   return (
-    <div className="absolute left-0 bottom-0 ml-2 mb-2 w-[400px]">
-      <div className=" bg-[#00000099] ml-1 rounded-md p-4">{messageLog}</div>
+    <div
+      className="absolute left-0 bottom-0 ml-2 mb-2 w-[400px]"
+      onMouseOver={() => setIsHovering(true)}
+      onMouseOut={() => setIsHovering(false)}
+    >
+      {/* <div className=" bg-[#00000099] ml-1 rounded-md p-4 max-h-[200px] overflow-auto">
+        {messageLog}
+      </div> */}
+
+      <div
+        className={`bg-[#00000099] ml-1 rounded-md p-4 max-h-[200px] overflow-auto transition-all duration-300
+      ${isHovering || isActive ? "" : "max-h-[60px]"}`}
+      >
+        {isHovering || isActive ? (
+          messageLog
+        ) : (
+          <div className="truncate">{messageLog.slice(-1)}</div>
+        )}
+      </div>
+
       <div className="flex items-center pl-4 gap-x-3 rounded-full bg-[#00000099] mt-3">
         <p>Chat: </p>
         <form className="w-full" onSubmit={sendMessage}>
@@ -99,6 +121,8 @@ const Chat = ({ socket }: props) => {
             ref={messageBox}
             value={messageInput}
             onChange={(e) => setMessageInput(e.target.value)}
+            onFocus={() => setIsActive(true)}
+            onBlur={() => setIsActive(false)}
             placeholder="Press enter to chat"
           />
         </form>
