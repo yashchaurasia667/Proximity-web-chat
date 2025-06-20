@@ -49,13 +49,11 @@ const VideoChat = () => {
           pc.addTrack(track, localStream);
 
         pc.addEventListener("signalingstatechange", () => {
-          console.log("Signaling state changed");
-          // console.log(e);
-          console.log(pc.signalingState);
+          console.log("Signaling state changed:", pc.signalingState);
         });
 
         pc.addEventListener("icecandidate", (e) => {
-          console.log("Got an ICE candidate!");
+          console.log("Got an ICE candidate...");
 
           if (e.candidate) {
             socket.emit("rtc_ice_candidate", {
@@ -69,18 +67,22 @@ const VideoChat = () => {
 
         pc.addEventListener("track", (e) => {
           if (remoteStream) {
-            console.log("Got remote stream!");
+            console.log("Got remote stream...");
 
-            for (const track of e.streams[0].getTracks()) {
-              remoteStream.addTrack(track);
-              // console.log("This should add some audio/video to remote feed");
-            }
+            setRemoteStream(() => {
+              const updated = new MediaStream();
+              for (const track of e.streams[0].getTracks()) {
+                updated.addTrack(track);
+              }
+              if (remoteRef.current) remoteRef.current.srcObject = updated;
+              return updated;
+            });
 
             if (remoteRef.current) remoteRef.current.srcObject = remoteStream;
           }
         });
 
-        if (offer) await pc.setRemoteDescription(offer);
+        if (type === "answer" && offer) await pc.setRemoteDescription(offer);
 
         setPeerConnection(pc);
       }
@@ -90,11 +92,12 @@ const VideoChat = () => {
 
   // set localref and remoteref to streams
   useEffect(() => {
-    if (localRef.current && remoteRef.current) {
+    if (localRef.current && remoteRef.current && !peerConnection) {
+      console.log("Setting local and remote streams");
       localRef.current.srcObject = localStream;
       remoteRef.current.srcObject = remoteStream;
     }
-  }, [localStream, remoteStream]);
+  }, [localStream, peerConnection, remoteStream]);
 
   // socket listeners for send offer, receive ice candidates and answers
   useEffect(() => {
@@ -127,15 +130,16 @@ const VideoChat = () => {
     socket.on("rtc_answer", async (data) => {
       if (peerConnection) {
         if (data.answererICECandidates) {
-          console.log("Got answerer's ice candidates");
           for (const ice of data.answererICECandidates) {
+            console.log("Got answerer's ice candidates");
             peerConnection.addIceCandidate(ice);
           }
         }
-
-        peerConnection.setRemoteDescription(
-          new RTCSessionDescription(data.answer)
-        );
+        if (peerConnection.signalingState !== "stable") {
+          peerConnection.setRemoteDescription(
+            new RTCSessionDescription(data.answer)
+          );
+        }
       }
     });
   }, [createPeerConnection, peerConnection]);
@@ -150,6 +154,8 @@ const VideoChat = () => {
   // 3. create offer
   useEffect(() => {
     if (!offer && peerConnection && !offerToAnswer) {
+      console.log("Creating an offer...");
+
       setType("offer");
       const createOffer = async () => {
         try {
@@ -172,11 +178,7 @@ const VideoChat = () => {
     const answerRemoteOffer = async () => {
       if (offerToAnswer && type == "answer") {
         if (peerConnection) {
-          console.log("creating an answer");
-          // console.log("adding offerer's ice candidates");
-          // for (const ice of offerToAnswer.offererICECandidates) {
-          //   peerConnection.addIceCandidate(ice);
-          // }
+          console.log("peerconnection found, creating an answer");
 
           await peerConnection.setRemoteDescription(
             new RTCSessionDescription(offerToAnswer.offer)
@@ -185,12 +187,18 @@ const VideoChat = () => {
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
 
+          for (const ice of offerToAnswer.offererICECandidates) {
+            console.log("adding offerer's ice candidates");
+            peerConnection.addIceCandidate(ice);
+          }
+
           socket.emit("rtc_answer", {
             id: socket.id,
             targetId: offerToAnswer.id,
             answer,
           });
         } else {
+          console.log("peerconnection not found, initiating call...");
           initCall();
           // createPeerConnection(offerToAnswer?.offer);
         }
@@ -202,6 +210,8 @@ const VideoChat = () => {
 
   // 1. enable user media and set streams
   const initCall = async () => {
+    console.log("Initiating call...");
+
     const constraints = {
       video: true,
       audio: {
@@ -220,7 +230,7 @@ const VideoChat = () => {
 
   // 1. initiate answer call
   const answer = async (offer: OfferEntry) => {
-    console.log("setting offer to answer");
+    console.log("Setting offer to answer...");
     setType("answer");
     setOfferToAnswer({ ...offer });
   };
