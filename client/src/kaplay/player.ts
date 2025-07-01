@@ -52,6 +52,7 @@ export default class Member {
         direction: k.vec2(0, 0),
         directionName: "walk-down",
       },
+      "player",
     ]);
   }
 

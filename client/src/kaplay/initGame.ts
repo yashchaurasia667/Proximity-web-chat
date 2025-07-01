@@ -49,7 +49,7 @@ export default async function initGame(name:string, sprite: string) {
     },
   });
 
-  // background
+  // BACKGROUND
   k.loadSprite("main_area", "/areas/main_area.png");
   const map = k.add([
     k.sprite("main_area"),
