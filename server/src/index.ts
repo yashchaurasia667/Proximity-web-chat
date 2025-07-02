@@ -5,7 +5,7 @@ import { app, server } from "./global.d.js";
 import socketStart from "./controllers/gameController.js";
 import RTCStart from "./controllers/RTCController.js";
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 9000;
 
 app.disable("x-powered-by");
 app.use(express.json());
