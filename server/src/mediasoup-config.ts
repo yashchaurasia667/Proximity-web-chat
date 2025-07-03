@@ -1,8 +1,9 @@
+import { WorkerLogLevel, WorkerLogTag } from "mediasoup/types";
 import os from "os";
 
 const __dirname = import.meta.dirname;
 
-export const config = {
+const config = {
   domain: process.env.DOMAIN || "localhost",
 
   https: {
@@ -25,8 +26,8 @@ export const config = {
       rtcMinPort: 10000,
       rtcMaxPort: 59999,
 
-      loglevel: "warn",
-      logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp"],
+      loglevel: "warn" as WorkerLogLevel,
+      logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp"] as WorkerLogTag[],
     },
 
     routerOptions: {
@@ -115,3 +116,5 @@ export const config = {
     },
   },
 };
+
+export default config;
