@@ -2,8 +2,9 @@ import express from "express";
 import cors from "cors";
 
 import { app, server } from "./global.d.js";
-import socketStart from "./controllers/gameController.js";
-import RTCStart from "./controllers/RTCController.js";
+import gameStart from "./controllers/gameController.js";
+import mediasoupStart from "./controllers/mediasoupController.js";
+// import RTCStart from "./controllers/RTCController.js";
 
 const PORT = process.env.PORT || 9000;
 
@@ -21,8 +22,9 @@ app.get("/ping", (req, res) => {
   res.json("pongg..");
 });
 
-socketStart();
-RTCStart();
+gameStart();
+mediasoupStart();
+// RTCStart();
 
 server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);

@@ -1,6 +1,6 @@
 import { KAPLAYCtx, Vec2 } from "kaplay";
 
-import { socket } from "../utils";
+import { gameSocket } from "../utils";
 import Member from "./player";
 
 export default class Lobby {
@@ -16,9 +16,9 @@ export default class Lobby {
     this.SPEED = speed;
     this.k = k;
     this.name = name;
-    this.addMember(socket.id!, "player", this.name, sprite);
+    this.addMember(gameSocket.id!, "player", this.name, sprite);
 
-    socket.on("player_joined", (data) => {
+    gameSocket.on("player_joined", (data) => {
       if (this.lobby.has(data.id)) return;
       this.addMember(
         data.id,
@@ -29,18 +29,18 @@ export default class Lobby {
       );
     });
 
-    socket.on("player_left", (data) => {
+    gameSocket.on("player_left", (data) => {
       if (this.lobby.has(data.id)) this.removeMember(data.id);
     });
 
-    socket.on("player_move", (data) => {
+    gameSocket.on("player_move", (data) => {
       if (this.lobby.has(data.id))
         this.lobby
           .get(data.id)
           ?.player.moveRemote(k.vec2(data.pos.x, data.pos.y));
     });
 
-    socket.on("lobby", (data) => {
+    gameSocket.on("lobby", (data) => {
       const rawLobby: Record<
         string,
         { name: string; sprite: string; pos: { x: number; y: number } }
@@ -78,7 +78,7 @@ export default class Lobby {
     pos = pos ? pos : this.k.center();
     const player = new Member(id, this.k, this.SPEED, type, pos, name, sprite);
     this.lobby.set(player.id, { name: name, pos: player.pos, player });
-    socket.emit("player_joined", { id, sprite, name: this.name, pos });
+    gameSocket.emit("player_joined", { id, sprite, name: this.name, pos });
   }
 
   private removeMember(id: string) {

@@ -3,12 +3,14 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-import { socket } from "../../utils";
+import { gameSocket } from "../../utils";
 import initGame from "../../kaplay/initGame";
 
 import Chat from "./Chat";
 import ControlKeys from "./ControlKeys";
 import ControlBar from "./ControlBar";
+
+// const game = gameSocket.of
 
 const Game = () => {
   const router = useRouter();
@@ -19,15 +21,15 @@ const Game = () => {
       const name = window.localStorage.getItem("name");
       if (sprite == null || name == null) router.push("/");
 
-      console.log("Connected with socket ID:", socket.id);
+      console.log("Connected with gameSocket ID:", gameSocket.id);
       initGame(name!, sprite!);
     };
 
-    socket.on("connect", handleConnect);
-    if (socket.connected) handleConnect();
+    gameSocket.on("connect", handleConnect);
+    if (gameSocket.connected) handleConnect();
 
     return () => {
-      socket.off("connect", handleConnect);
+      gameSocket.off("connect", handleConnect);
     };
   }, [router]);
 
@@ -54,7 +56,7 @@ const Game = () => {
 
       <ControlBar mic={false} camera={false} />
 
-      <Chat socket={socket} />
+      <Chat socket={gameSocket} />
     </>
   );
 };

@@ -1,4 +1,8 @@
-import { WorkerLogLevel, WorkerLogTag } from "mediasoup/types";
+import {
+  WorkerLogLevel,
+  WorkerLogTag,
+  RtpCodecCapability,
+} from "mediasoup/types";
 import os from "os";
 
 const __dirname = import.meta.dirname;
@@ -66,7 +70,7 @@ const config = {
             "x-google-start-bitrate": 1000,
           },
         },
-      ],
+      ] as RtpCodecCapability[],
     },
 
     webRtcServerOptions: {

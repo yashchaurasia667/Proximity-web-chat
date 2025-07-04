@@ -1,5 +1,7 @@
 import { io } from "../global.d.js";
 
+const rtc = io.of("/game");
+
 const RTCStart = () => {
   // offerer_id: {offer, ice candidates[], answer_id, answer, answerer_ice_candidates}
   const offers = new Map<
@@ -18,7 +20,7 @@ const RTCStart = () => {
     return offerObj;
   };
 
-  io.on("connection", (socket) => {
+  rtc.on("connection", (socket) => {
     // console.log(`User connected: ${socket.id}`);
     if (offers.size > 0) {
       socket.to(socket.id).emit("rtc_offer", emitOffers());
@@ -68,13 +70,11 @@ const RTCStart = () => {
       if (offer) {
         offer.answer = data.answer;
         offers.set(data.targetId, offer);
-        socket
-          .to(data.targetId)
-          .emit("rtc_answer", {
-            id: offer.answererId,
-            answer: offer.answer,
-            answererICECandidates: offer.answererICECandidate,
-          });
+        socket.to(data.targetId).emit("rtc_answer", {
+          id: offer.answererId,
+          answer: offer.answer,
+          answererICECandidates: offer.answererICECandidate,
+        });
       }
     });
 

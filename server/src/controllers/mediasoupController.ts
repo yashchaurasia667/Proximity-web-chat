@@ -1,23 +1,45 @@
-import { types as mediasoupTypes, createWorker } from "mediasoup";
+import { io } from "../global.d.js";
 
-import { io, Room } from "../global.d.js";
+import * as mediasoup from "mediasoup";
+import config from "../mediasoup-config.js";
+import { Router, Worker } from "mediasoup/types";
 
-const workers: mediasoupTypes.Worker[] = [];
-const rooms = new Map<string, Room>();
+const peers = io.of("/mediasoup");
+let worker: Worker;
+let router: Router;
 
-export const startMediasoup = async () => {
-  const worker = await createWorker();
-  workers.push(worker);
+const createWorker = async () => {
+  const worker = await mediasoup.createWorker();
+  console.log(`worker pid: ${worker.pid}`);
 
-  io.on("connection", (socket) => {
-    socket.on("joinRoom", async ({ roomName }: { roomName: string }) => {
-      let room = rooms.get(roomName);
-      if (!room) {
-        room = new Room(worker);
-        rooms.set(roomName, room);
-      }
+  worker.on("died", (error) => {
+    console.log(
+      "mediasoup worker has died, the process will exit in 2 seconds...",
+      error
+    );
 
-      await room.addPeer(socket);
+    setTimeout(() => {
+      process.exit(1);
+    }, 2000);
+  });
+
+  return worker;
+};
+
+const mediasoupStart = async () => {
+  worker = await createWorker();
+
+  peers.on("connection", async (socket) => {
+    console.log(socket.id);
+
+    socket.on("disconnect", () => {
+      console.log(`${socket.id} has disconnected`);
+    });
+
+    router = await worker.createRouter({
+      mediaCodecs: config.mediasoup.routerOptions.mediaCodecs,
     });
   });
 };
+
+export default mediasoupStart;

@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-const socket = io("https://localhost:9000");
+const gameSocket = io("https://localhost:9000/game");
 
 let wait = false;
 const throttle = (callback: () => void, delay: number) => {
@@ -15,4 +15,4 @@ const throttle = (callback: () => void, delay: number) => {
   };
 };
 
-export { throttle, socket };
+export { throttle, gameSocket };

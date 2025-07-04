@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { socket } from "../../utils";
+import { gameSocket } from "../../utils";
 
 type OfferEntry = {
   id: string;
@@ -56,9 +56,9 @@ const VideoChat = () => {
           console.log("Got an ICE candidate...");
 
           if (e.candidate) {
-            socket.emit("rtc_ice_candidate", {
+            gameSocket.emit("rtc_ice_candidate", {
               iceCandidate: e.candidate,
-              id: socket.id,
+              id: gameSocket.id,
               didIOffer: type === "offer",
               targetId: offerToAnswer?.id,
             });
@@ -99,9 +99,9 @@ const VideoChat = () => {
     }
   }, [localStream, peerConnection, remoteStream]);
 
-  // socket listeners for send offer, receive ice candidates and answers
+  // gameSocket listeners for send offer, receive ice candidates and answers
   useEffect(() => {
-    socket.on(
+    gameSocket.on(
       "rtc_offer",
       (data: { offer: Record<string, Omit<OfferEntry, "id">> }) => {
         if (data.offer) {
@@ -122,12 +122,12 @@ const VideoChat = () => {
       }
     );
 
-    socket.on("rtc_ice_candidates", (data) => {
+    gameSocket.on("rtc_ice_candidates", (data) => {
       console.log("adding ice candidates");
       peerConnection?.addIceCandidate(data.iceCandidate);
     });
 
-    socket.on("rtc_answer", async (data) => {
+    gameSocket.on("rtc_answer", async (data) => {
       if (peerConnection) {
         if (data.answererICECandidates) {
           for (const ice of data.answererICECandidates) {
@@ -163,7 +163,7 @@ const VideoChat = () => {
           await peerConnection?.setLocalDescription(offer);
           setOffer(offer);
 
-          socket.emit("rtc_offer", { id: socket.id, offer });
+          gameSocket.emit("rtc_offer", { id: gameSocket.id, offer });
         } catch (error) {
           console.error(error);
         }
@@ -192,8 +192,8 @@ const VideoChat = () => {
             peerConnection.addIceCandidate(ice);
           }
 
-          socket.emit("rtc_answer", {
-            id: socket.id,
+          gameSocket.emit("rtc_answer", {
+            id: gameSocket.id,
             targetId: offerToAnswer.id,
             answer,
           });

@@ -1,5 +1,5 @@
 import { GameObj, KAPLAYCtx, Vec2 } from "kaplay";
-import { throttle, socket } from "../utils";
+import { throttle, gameSocket } from "../utils";
 
 export default class Member {
   public id: string;
@@ -61,8 +61,8 @@ export default class Member {
   }
 
   private emitMovement() {
-    socket.emit("player_move", {
-      id: socket.id,
+    gameSocket.emit("player_move", {
+      id: gameSocket.id,
       pos: this.player.pos,
       name: this.name,
       sprite: this.sprite,
