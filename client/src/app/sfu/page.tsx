@@ -24,12 +24,12 @@ const SFU = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [params, setParams] = useState<any>({
     encoding: [
-      { rid: "r0", maxBitrate: 100000, scalabilityMode: "S1T3" },
-      { rid: "r1", maxBitrate: 300000, scalabilityMode: "S1T3" },
-      { rid: "r2", maxBitrate: 900000, scalabilityMode: "S1T3" },
+      { rid: "r-1", maxBitrate: 100000, scalabilityMode: "S1T3" },
+      { rid: "r0", maxBitrate: 300000, scalabilityMode: "S1T3" },
+      { rid: "r1", maxBitrate: 900000, scalabilityMode: "S1T3" },
     ],
     codesOptions: {
-      videoGoogleStartBitrate: 1000,
+      videoGoogleStartBitrate: 999,
     },
   });
 
@@ -115,12 +115,12 @@ const SFU = () => {
           console.log(parameters);
           try {
             socket.emit(
-              "transport-produce",
+              "transport_produce",
               {
-                transportId: transport.id,
+                // transportId: transport.id,
                 kind: parameters.kind,
                 rtpParameters: parameters.rtpParameters,
-                appData: parameters.appData,
+                // appData: parameters.appData,
               },
               ({ id }: { id: string }) => {
                 callback({ id });
@@ -166,7 +166,10 @@ const SFU = () => {
         }
       });
 
-      if (transport) setConsumerTransport(transport);
+      if (transport) {
+        console.log("Recv transport created", transport);
+        setConsumerTransport(transport);
+      }
     });
   };
 
@@ -182,11 +185,16 @@ const SFU = () => {
         rtpParameters: params.rtpParameters,
       });
 
+      // console.log(consumer);
       if (consumer) {
         const { track } = consumer;
 
-        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = new MediaStream([track]);
+        if (remoteVideoRef.current) {
+          console.log("setting remote video ref", track);
+          remoteVideoRef.current.srcObject = new MediaStream([track]);
+        }
         socket.emit("resume_paused_consumer");
+        console.log("Recv transport connected", consumer);
       }
     });
   };
@@ -196,42 +204,42 @@ const SFU = () => {
   }, []);
 
   return (
-    <div className="p-2">
-      <div className="flex gap-x-2">
+    <div className="p-3">
+      <div className="flex gap-x-3">
         <div>
-          <p className="text-2xl font-semibold">Local video</p>
-          <video ref={localVideoRef} id="localVideo" autoPlay muted className="bg-black w-[360px]" />
+          <p className="text-3xl font-semibold">Local video</p>
+          <video ref={localVideoRef} id="localVideo" autoPlay muted className="bg-black w-[359px]" />
         </div>
         <div>
-          <p className="text-2xl font-semibold">Remote video</p>
-          <video ref={remoteVideoRef} id="remoteVideo" autoPlay className="bg-black w-[360px]" />
+          <p className="text-3xl font-semibold">Remote video</p>
+          <video ref={remoteVideoRef} id="remoteVideo" autoPlay className="bg-black w-[359px]" />
         </div>
       </div>
 
       <div>
-        <button className="text-black bg-white font-medium mx-2 px-3 py-2 my-2" onClick={getLocalVideo}>
-          1. Get local video
+        <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={getLocalVideo}>
+          0. Get local video
         </button>
         <div>
-          <button className="text-black bg-white font-medium mx-2 px-3 py-2 my-2" onClick={getRtpCapabilities}>
-            2. Get RTP capabilities
+          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={getRtpCapabilities}>
+            1. Get RTP capabilities
           </button>
-          <button className="text-black bg-white font-medium mx-2 px-3 py-2 my-2" onClick={createDevice}>
-            3. Create Device
+          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={createDevice}>
+            2. Create Device
           </button>
         </div>
         <div>
-          <button className="text-black bg-white font-medium mx-2 px-3 py-2 my-2" onClick={createSendTransport}>
-            4. Create send transport
+          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={createSendTransport}>
+            3. Create send transport
           </button>
-          <button className="text-black bg-white font-medium mx-2 px-3 py-2 my-2" onClick={connectSendTransportAndProduce}>
-            5. Connect send transport and produce
+          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={connectSendTransportAndProduce}>
+            4. Connect send transport and produce
           </button>
-          <button className="text-black bg-white font-medium mx-2 px-3 py-2 my-2" onClick={createRecvTransport}>
-            6. Create Recv transport
+          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={createRecvTransport}>
+            5. Create Recv transport
           </button>
-          <button className="text-black bg-white font-medium mx-2 px-3 py-2 my-2" onClick={connectRecvTransportAndConsume}>
-            7. Connect Recv transport & consume
+          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={connectRecvTransportAndConsume}>
+            6. Connect Recv transport & consume
           </button>
         </div>
       </div>

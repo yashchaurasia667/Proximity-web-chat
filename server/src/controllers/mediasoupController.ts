@@ -106,6 +106,7 @@ const mediasoupStart = async () => {
 
     socket.on("connect_producer_transport", async ({ dtlsParameters }) => {
       await producerTransport.connect({ dtlsParameters });
+      console.log("Producer transport connected");
     });
 
     socket.on(
@@ -132,6 +133,7 @@ const mediasoupStart = async () => {
     socket.on("consume_media", async ({ rtpCapabilities }, callback) => {
       try {
         if (producer) {
+      console.log("consume media");
           if (
             !router.canConsume({ producerId: producer.id, rtpCapabilities })
           ) {
