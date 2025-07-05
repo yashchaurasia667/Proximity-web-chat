@@ -2,6 +2,7 @@ import {
   WorkerLogLevel,
   WorkerLogTag,
   RtpCodecCapability,
+  WebRtcTransportOptions,
 } from "mediasoup/types";
 import os from "os";
 
@@ -117,7 +118,7 @@ const config = {
       maxSctpMessageSize: 262144,
 
       maxIncomingBitrate: 1500000,
-    },
+    } as WebRtcTransportOptions,
   },
 };
 

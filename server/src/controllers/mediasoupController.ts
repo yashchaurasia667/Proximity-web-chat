@@ -1,12 +1,14 @@
 import { io } from "../global.d.js";
+import config from "../mediasoup-config.js";
 
 import * as mediasoup from "mediasoup";
-import config from "../mediasoup-config.js";
-import { Router, Worker } from "mediasoup/types";
+import { Router, WebRtcTransport, Worker } from "mediasoup/types";
 
 const peers = io.of("/mediasoup");
 let worker: Worker;
 let router: Router;
+let producerTransport: WebRtcTransport;
+let consumerTransport: WebRtcTransport;
 
 const createWorker = async () => {
   const worker = await mediasoup.createWorker();
@@ -26,6 +28,38 @@ const createWorker = async () => {
   return worker;
 };
 
+const createWebRtcTransport = async (callback) => {
+  try {
+    const transport = await router.createWebRtcTransport(
+      config.mediasoup.webRtcTransportOptions
+    );
+    console.log("Transport id:", transport.id);
+
+    transport.on("dtlsstatechange", (dtlsState) => {
+      if (dtlsState === "closed") transport.close();
+    });
+
+    callback({
+      params: {
+        // ...transport,
+        id: transport.id,
+        iceParameters: transport.iceParameters,
+        iceCandidates: transport.iceCandidates,
+        dtlsParameters: transport.dtlsParameters,
+      },
+    });
+
+    return transport;
+  } catch (error) {
+    console.log(error);
+    callback({
+      params: {
+        error: error,
+      },
+    });
+  }
+};
+
 const mediasoupStart = async () => {
   worker = await createWorker();
 
@@ -34,6 +68,22 @@ const mediasoupStart = async () => {
 
     socket.on("disconnect", () => {
       console.log(`${socket.id} has disconnected`);
+    });
+
+    socket.on("getRtpCapabilities", (callback) => {
+      const rtpCapabilities = router.rtpCapabilities;
+      console.log("rtp capabilities", rtpCapabilities);
+
+      callback({ rtpCapabilities });
+    });
+
+    socket.on("createWebRtcTransport", async ({ sender }, callback) => {
+      console.log(`Is this a sender request? ${sender}`);
+      const transport = await createWebRtcTransport(callback);
+      if (transport) {
+        if (sender) producerTransport = transport;
+        else consumerTransport = transport;
+      }
     });
 
     router = await worker.createRouter({
