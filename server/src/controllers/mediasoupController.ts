@@ -2,16 +2,7 @@ import { io } from "../global.d.js";
 import config from "../mediasoup-config.js";
 
 import * as mediasoup from "mediasoup";
-import {
-  Consumer,
-  DtlsParameters,
-  IceCandidate,
-  IceParameters,
-  Producer,
-  Router,
-  WebRtcTransport,
-  Worker,
-} from "mediasoup/types";
+import { Consumer, DtlsParameters, IceCandidate, IceParameters, Producer, Router, WebRtcTransport, Worker } from "mediasoup/types";
 
 const mediasoupStart = async () => {
   const peers = io.of("/mediasoup");
@@ -21,14 +12,10 @@ const mediasoupStart = async () => {
   let consumer: Consumer;
 
   const createWorker = async (): Promise<Worker> => {
-    const newWorker = await mediasoup.createWorker(
-      config.mediasoup.workerSettings
-    );
+    const newWorker = await mediasoup.createWorker(config.mediasoup.workerSettings);
 
     newWorker.on("died", () => {
-      console.log(
-        `worker ${newWorker.pid} has died, the process will close in 2 seconds...`
-      );
+      console.log(`worker ${newWorker.pid} has died, the process will close in 2 seconds...`);
 
       setTimeout(() => {
         process.exit(1);
@@ -37,6 +24,9 @@ const mediasoupStart = async () => {
 
     return newWorker;
   };
+
+  const worker: Worker = await createWorker();
+  const router: Router = await worker.createRouter(config.mediasoup.routerOptions);
 
   const createWebRtcTransport = async (
     router: Router,
@@ -52,9 +42,7 @@ const mediasoupStart = async () => {
     }) => void
   ) => {
     try {
-      const transport = await router.createWebRtcTransport(
-        config.mediasoup.webRtcTransportOptions
-      );
+      const transport = await router.createWebRtcTransport(config.mediasoup.webRtcTransportOptions);
       console.log("Transport Created: ", transport);
 
       transport.on("dtlsstatechange", (dtlsState) => {
@@ -81,11 +69,6 @@ const mediasoupStart = async () => {
   };
 
   peers.on("connection", async (socket) => {
-    const worker: Worker = await createWorker();
-    const router: Router = await worker.createRouter(
-      config.mediasoup.routerOptions
-    );
-
     socket.on("disconnect", () => {
       console.log("peer disconnected");
     });
@@ -109,22 +92,19 @@ const mediasoupStart = async () => {
       console.log("Producer transport connected");
     });
 
-    socket.on(
-      "transport_produce",
-      async ({ kind, rtpParameters }, callback) => {
-        producer = await producerTransport.produce({
-          kind,
-          rtpParameters,
-        });
+    socket.on("transport_produce", async ({ kind, rtpParameters }, callback) => {
+      producer = await producerTransport.produce({
+        kind,
+        rtpParameters,
+      });
 
-        producer.on("transportclose", () => {
-          console.log("Producer Transport closed");
-          producer.close();
-        });
+      producer.on("transportclose", () => {
+        console.log("Producer Transport closed");
+        producer.close();
+      });
 
-        callback({ id: producer.id });
-      }
-    );
+      callback({ id: producer.id });
+    });
 
     socket.on("connect_consumer_transport", async ({ dtlsParameters }) => {
       await consumerTransport.connect({ dtlsParameters });
@@ -133,10 +113,8 @@ const mediasoupStart = async () => {
     socket.on("consume_media", async ({ rtpCapabilities }, callback) => {
       try {
         if (producer) {
-      console.log("consume media");
-          if (
-            !router.canConsume({ producerId: producer.id, rtpCapabilities })
-          ) {
+          // console.log("consume media");
+          if (!router.canConsume({ producerId: producer.id, rtpCapabilities })) {
             console.error("Cannot consume");
             return;
           }
@@ -146,7 +124,7 @@ const mediasoupStart = async () => {
           consumer = await consumerTransport.consume({
             producerId: producer.id,
             rtpCapabilities,
-            paused: producer.kind === "video",
+            paused: true,
           });
 
           consumer?.on("transportclose", () => {
@@ -173,6 +151,7 @@ const mediasoupStart = async () => {
         callback({ params: { error } });
       }
     });
+
     socket.on("resume_paused_consumer", async () => {
       console.log("consume resume");
       await consumer.resume();
