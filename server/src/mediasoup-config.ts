@@ -1,9 +1,4 @@
-import {
-  WorkerLogLevel,
-  WorkerLogTag,
-  RtpCodecCapability,
-  WebRtcTransportOptions,
-} from "mediasoup/types";
+import { WorkerLogLevel, WorkerLogTag, RtpCodecCapability, WebRtcTransportOptions } from "mediasoup/types";
 import os from "os";
 
 const __dirname = import.meta.dirname;
