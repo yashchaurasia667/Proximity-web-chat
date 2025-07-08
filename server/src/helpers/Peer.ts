@@ -1,47 +1,62 @@
 import { Consumer, DtlsParameters, MediaKind, Producer, RtpCapabilities, RtpParameters, WebRtcTransport } from "mediasoup/types";
 
-type peerType = {
-  id: string;
-  name: string;
-  transports: Map<string, WebRtcTransport>;
-  consumers: Map<string, Consumer>;
-  producers: Map<string, Producer>;
-  addTransport: (transport: WebRtcTransport) => void;
-  connectTransport: (transport_id: string, dtlsParameters: DtlsParameters) => Promise<void>;
-};
+// type peerType = {
+//   id: string;
+//   name: string;
+//   producers: Map<string, Producer>;
+//   addTransports(id: string, transport: WebRtcTransport): void;
+//   connectTransport(id: string, dtlsParameters: DtlsParameters): Promise<void>;
+//   createProducer(transportId: string, rtpParameters: RtpParameters, kind: MediaKind): Promise<Producer>;
+//   createConsumer(
+//     transportId: string,
+//     producerId: string,
+//     rtpCapabilities: RtpCapabilities
+//   ): Promise<{
+//     consumer: Consumer;
+//     params: {
+//       id: string;
+//       rtpParameters: RtpParameters;
+//       type: ConsumerType;
+//       producerPaused: boolean;
+//     };
+//   }>;
+//   closeProducer(id: string): void;
+//   getProducer(id: string): Producer | undefined;
+//   close(): void;
+//   removeConsumer(id: string): void;
+// };
 
 class Peer {
   public id: string;
   public name: string;
-  public transports: Map<string, WebRtcTransport>;
-  public consumers: Map<string, Consumer>;
+  private transports: Map<string, WebRtcTransport>;
   public producers: Map<string, Producer>;
+  private consumers: Map<string, Consumer>;
 
   constructor(socket_id: string, name: string) {
     this.id = socket_id;
     this.name = name;
     this.transports = new Map();
-    this.consumers = new Map();
     this.producers = new Map();
+    this.consumers = new Map();
   }
 
-  addTransport(transport: WebRtcTransport) {
-    this.transports.set(transport.id, transport);
+  addTransport(id: string, transport: WebRtcTransport) {
+    this.transports.set(id, transport);
   }
 
-  async connectTransport(transport_id: string, dtlsParameters: DtlsParameters) {
-    const transport = this.transports.get(transport_id);
+  async connectTransport(id: string, dtlsParameters: DtlsParameters) {
+    const transport = this.transports.get(id);
     if (transport) {
-      await transport.connect({ dtlsParameters: dtlsParameters });
-      this.transports.set(transport.id, transport);
+      await transport.connect({ dtlsParameters });
+      this.transports.set(id, transport);
     }
   }
 
-  async createProducer(producerTransportId: string, rtpParameters: RtpParameters, kind: MediaKind) {
-    //TODO handle null errors
-    const producerTransport = this.transports.get(producerTransportId);
-    if (producerTransport) {
-      const producer = await producerTransport.produce({
+  async createProducer(transportId: string, rtpParameters: RtpParameters, kind: MediaKind) {
+    const tp = this.transports.get(transportId);
+    if (tp) {
+      const producer = await tp.produce({
         kind,
         rtpParameters,
       });
@@ -49,7 +64,6 @@ class Peer {
       this.producers.set(producer.id, producer);
 
       producer.on("transportclose", () => {
-        console.log("Producer transport close", { name: `${this.name}`, consumer_id: `${producer.id}` });
         producer.close();
         this.producers.delete(producer.id);
       });
@@ -58,70 +72,62 @@ class Peer {
     }
   }
 
-  async createConsumer(consumer_transport_id: string, producer_id: string, rtpCapabilities: RtpCapabilities) {
-    const consumerTransport = this.transports.get(consumer_transport_id);
-
-    let consumer = null;
+  async createConsumer(transportId: string, producerId: string, rtpCapabilities: RtpCapabilities) {
+    const tp = this.transports.get(transportId);
+    let consumer;
     try {
-      consumer = await consumerTransport.consume({
-        producerId: producer_id,
-        rtpCapabilities,
-        paused: false, //producer.kind === 'video',
-      });
+      if (tp) {
+        consumer = await tp.consume({ producerId, rtpCapabilities, paused: false });
+      }
     } catch (error) {
-      console.error("Consume failed", error);
+      console.error("consume failed:", error);
       return;
     }
 
-    if (consumer.type === "simulcast") {
+    if (consumer?.type === "simulcast") {
       await consumer.setPreferredLayers({
         spatialLayer: 2,
         temporalLayer: 2,
       });
     }
 
-    this.consumers.set(consumer.id, consumer);
+    if (consumer) this.consumers.set(consumer.id, consumer);
 
-    consumer.on("transportclose", () => {
-      console.log("Consumer transport close", { name: `${this.name}`, consumer_id: `${consumer.id}` });
+    consumer?.on("transportclose", () => {
       this.consumers.delete(consumer.id);
     });
 
     return {
       consumer,
       params: {
-        producerId: producer_id,
-        id: consumer.id,
-        kind: consumer.kind,
-        rtpParameters: consumer.rtpParameters,
-        type: consumer.type,
-        producerPaused: consumer.producerPaused,
+        producerId,
+        id: consumer?.id,
+        rtpParameters: consumer?.rtpParameters,
+        type: consumer?.type,
+        producerPaused: consumer?.producerPaused,
       },
     };
   }
 
-  closeProducer(producer_id: string) {
-    try {
-      this.producers.get(producer_id).close();
-    } catch (e) {
-      console.warn(e);
+  closeProducer(id: string) {
+    const prod = this.producers.get(id);
+    if (prod) {
+      prod.close();
     }
-
-    this.producers.delete(producer_id);
   }
 
-  getProducer(producer_id: string) {
-    return this.producers.get(producer_id);
+  getProducer(id: string) {
+    return this.producers.get(id);
   }
 
   close() {
     this.transports.forEach((transport) => transport.close());
   }
 
-  removeConsumer(consumer_id: string) {
-    this.consumers.delete(consumer_id);
+  removeConsumer(id: string) {
+    this.consumers.delete(id);
   }
 }
 
 export default Peer;
-export type { peerType };
+// export type { peerType };

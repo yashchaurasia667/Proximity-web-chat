@@ -1,41 +1,69 @@
+import { DtlsParameters, MediaKind, Router, RtpCapabilities, RtpParameters, Worker } from "mediasoup/types";
+import { Namespace } from "socket.io";
+
 import config from "../mediasoup-config.js";
-import { peerType } from "./Peer.js";
+import Peer from "./Peer.js";
 
-import { Socket } from "socket.io";
-import { DtlsParameters, MediaKind, Router, RtpParameters, Worker } from "mediasoup/types";
+// type params = {
+//   id: string;
+//   iceParameters: IceParameters;
+//   iceCandidates: IceCandidate;
+//   dtlsParameters: DtlsParameters;
+// };
 
-type roomType = {
-  id: string;
-  peers: Map<string, peerType>;
-};
+// type consumerParams = {
+//   producerId: string;
+//   id: string;
+//   rtpParameters: RtpParameters;
+//   type: ConsumerType;
+//   producerPaused: boolean;
+// };
+
+// type roomType = {
+//   id: string;
+//   addPeer(peer: Peer): void;
+//   getProducerListForPeer(): { producerId: string }[];
+//   getRtpCapabilities(): RtpCapabilities;
+//   createWebRtcTransport(socketId: string): Promise<params>;
+//   connectPeerTransport(socketId: string, transportId: string, dtlsParameters: DtlsParameters): Promise<void>;
+//   produce(socketId: string, producerTransportId: string, rtpParameters: RtpParameters): Promise<void>;
+//   consume(socketId: string, consumerTransportId: string, rtpCapabilities: RtpCapabilities): Promise<consumerParams>;
+//   removePeer(socketId: string): void;
+//   closeProducer(socketId: string, producerId: string): void;
+//   broadcast(socketId: string, name: string, data: unknown): void;
+//   send(socketId: string, name: string, data: unknown): void;
+//   getPeers(): Map<string, Peer>;
+//   toJSON(): { id: string; peers: string };
+// };
 
 class Room {
   public id: string;
-  public peers: Map<string, peerType>;
-  private io: Socket;
-  private router: Router;
+  private io: Namespace;
+  private router!: Router;
+  private peers: Map<string, Peer>;
 
-  constructor(room_id: string, worker: Worker, io: Socket) {
+  constructor(room_id: string, io: Namespace, worker: Worker) {
     this.id = room_id;
     this.io = io;
     this.peers = new Map();
-    const mediaCodecs = config.mediasoup.routerOptions.mediaCodecs;
-    worker.createRouter({ mediaCodecs }).then((router) => (this.router = router));
+
+    worker.createRouter(config.mediasoup.routerOptions).then((router) => (this.router = router));
   }
 
-  addPeer(peer: peerType) {
+  addPeer(peer: Peer) {
     this.peers.set(peer.id, peer);
   }
 
   getProducerListForPeer() {
-    const producerList: { producer_id: string }[] = [];
+    const producerList: { producerId: string }[] = [];
     this.peers.forEach((peer) => {
       peer.producers.forEach((producer) => {
         producerList.push({
-          producer_id: producer.id,
+          producerId: producer.id,
         });
       });
     });
+
     return producerList;
   }
 
@@ -43,133 +71,101 @@ class Room {
     return this.router.rtpCapabilities;
   }
 
-  async createWebRtcTransport(socket_id: string) {
-    // const { initialAvailableOutgoingBitrate } = config.mediasoup.webRtcTransportOptions;
-
+  async createWebRtcTransport(socketId: string) {
     const transport = await this.router.createWebRtcTransport(config.mediasoup.webRtcTransportOptions);
-
-    // const transport = await this.router.createWebRtcTransport({
-    // listenIps: config.mediasoup.webRtcTransportOptions.listenIps,
-    // enableUdp: true,
-    // enableTcp: true,
-    // preferUdp: true,
-    // initialAvailableOutgoingBitrate,
-    // });
-
-    // if (maxIncomingBitrate) {
-    //   try {
-    //     await transport.setMaxIncomingBitrate(maxIncomingBitrate);
-    //   } catch (error) {}
-    // }
 
     transport.on("dtlsstatechange", (dtlsState) => {
       if (dtlsState === "closed") {
-        // console.log("Transport close", { name: this.peers.get(socket_id).name });
+        console.log("Transport closed");
         transport.close();
       }
     });
 
     transport.on("@close", () => {
-      console.log("Transport close");
+      console.log("Transport has cloesd.");
     });
 
-    console.log("Adding transport", { transportId: transport.id });
-    const peer = this.peers.get(socket_id);
-    if (peer !== undefined) {
-      peer.addTransport(transport);
-      this.peers.set(peer.id, peer);
-      return {
-        params: {
-          id: transport.id,
-          iceParameters: transport.iceParameters,
-          iceCandidates: transport.iceCandidates,
-          dtlsParameters: transport.dtlsParameters,
-        },
-      };
-    }
-  }
-
-  async connectPeerTransport(socket_id: string, transport_id: string, dtlsParameters: DtlsParameters) {
-    const peer = this.peers.get(socket_id);
+    const peer = this.peers.get(socketId);
     if (peer) {
-      await peer.connectTransport(transport_id, dtlsParameters);
+      peer.addTransport(transport.id, transport);
+      this.peers.set(peer.id, peer);
+    }
+
+    return {
+      params: {
+        id: transport.id,
+        iceParameters: transport.iceParameters,
+        iceCandidates: transport.iceCandidates,
+        dtlsParameters: transport.dtlsParameters,
+      },
+    };
+  }
+
+  async connectPeerTransport(socketId: string, transportId: string, dtlsParameters: DtlsParameters) {
+    const peer = this.peers.get(socketId);
+    if (peer) {
+      await peer.connectTransport(transportId, dtlsParameters);
     }
   }
 
-  async produce(socket_id: string, producerTransportId: string, rtpParameters: RtpParameters, kind: MediaKind) {
-    // handle undefined errors
-    return new Promise(async (resolve, reject) => {
-      const peer = this.peers.get(socket_id);
-      if (peer) {
-
-       const producer = await peer.createProducer(producerTransportId, rtpParameters, kind);
-      resolve(producer.id);
-      this.broadCast(socket_id, "newProducers", [
+  async produce(socketId: string, producerTransportId: string, rtpParameters: RtpParameters, kind: MediaKind) {
+    const producer = await this.peers.get(socketId)?.createProducer(producerTransportId, rtpParameters, kind);
+    if (producer) {
+      this.broadcast(socketId, "newProducers", [
         {
-          producer_id: producer.id,
-          producer_socket_id: socket_id,
+          producerId: producer.id,
+          producerSocketId: socketId,
         },
       ]);
-    });
-      }
+    }
   }
 
-  async consume(socket_id, consumer_transport_id, producer_id, rtpCapabilities) {
-    // handle nulls
-    if (
-      !this.router.canConsume({
-        producerId: producer_id,
-        rtpCapabilities,
-      })
-    ) {
+  async consume(socketId: string, consumerTransportId: string, producerId: string, rtpCapabilities: RtpCapabilities) {
+    if (!this.router.canConsume({ producerId, rtpCapabilities })) {
       console.error("can not consume");
       return;
     }
 
-    let { consumer, params } = await this.peers.get(socket_id).createConsumer(consumer_transport_id, producer_id, rtpCapabilities);
+    const res = await this.peers.get(socketId)?.createConsumer(consumerTransportId, producerId, rtpCapabilities);
+    if (res?.consumer && res.params) {
+      const { consumer, params } = res;
 
-    consumer.on(
-      "producerclose",
-      function () {
-        console.log("Consumer closed due to producerclose event", {
-          name: `${this.peers.get(socket_id).name}`,
-          consumer_id: `${consumer.id}`,
-        });
-        this.peers.get(socket_id).removeConsumer(consumer.id);
-        // tell client consumer is dead
-        this.io.to(socket_id).emit("consumerClosed", {
-          consumer_id: consumer.id,
-        });
-      }.bind(this)
-    );
-
-    return params;
+      consumer.on("producerclose", () => {
+        this.peers.get(socketId)?.removeConsumer(consumer.id);
+        this.io.to(socketId).emit("consumerClosed", { consumer_id: consumer.id });
+      });
+      return params;
+    }
   }
 
-  async removePeer(socket_id) {
-    this.peers.get(socket_id).close();
-    this.peers.delete(socket_id);
+  removePeer(socketId: string) {
+    if (this.peers.has(socketId)) {
+      this.peers.get(socketId)?.close();
+      this.peers.delete(socketId);
+    }
   }
 
-  closeProducer(socket_id, producer_id) {
-    this.peers.get(socket_id).closeProducer(producer_id);
+  closeProducer(socketId: string, producerId: string) {
+    if (this.peers.has(socketId)) {
+      this.peers.get(socketId)?.closeProducer(producerId);
+    }
   }
 
-  broadCast(socket_id, name, data) {
-    for (let otherID of Array.from(this.peers.keys()).filter((id) => id !== socket_id)) {
+  broadcast(socketId: string, name: string, data: unknown) {
+    for (const otherID of Array.from(this.peers.keys()).filter((id) => id !== socketId)) {
       this.send(otherID, name, data);
     }
   }
 
-  send(socket_id, name, data) {
-    this.io.to(socket_id).emit(name, data);
+  send(socketId: string, name: string, data: unknown) {
+    this.io.to(socketId).emit(name, data);
   }
 
   getPeers() {
     return this.peers;
   }
 
-  toJson() {
+  toJSON() {
     return {
       id: this.id,
       peers: JSON.stringify([...this.peers]),
@@ -178,4 +174,4 @@ class Room {
 }
 
 export default Room;
-export type { roomType };
+// export type { roomType };
