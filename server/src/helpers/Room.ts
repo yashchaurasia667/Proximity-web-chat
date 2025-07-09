@@ -109,15 +109,26 @@ class Room {
   }
 
   async produce(socketId: string, producerTransportId: string, rtpParameters: RtpParameters, kind: MediaKind) {
-    const producer = await this.peers.get(socketId)?.createProducer(producerTransportId, rtpParameters, kind);
-    if (producer) {
+    return new Promise(async (resolve) => {
+      const producer = await this.peers.get(socketId)?.createProducer(producerTransportId, rtpParameters, kind);
+      resolve(producer?.id);
       this.broadcast(socketId, "newProducers", [
         {
-          producerId: producer.id,
-          producerSocketId: socketId,
+          producer_id: producer?.id,
+          producer_socket_id: socketId,
         },
       ]);
-    }
+    });
+
+    // const producer = await this.peers.get(socketId)?.createProducer(producerTransportId, rtpParameters, kind);
+    // if (producer) {
+    //   this.broadcast(socketId, "newProducers", [
+    //     {
+    //       producerId: producer.id,
+    //       producerSocketId: socketId,
+    //     },
+    //   ]);
+    // }
   }
 
   async consume(socketId: string, consumerTransportId: string, producerId: string, rtpCapabilities: RtpCapabilities) {
