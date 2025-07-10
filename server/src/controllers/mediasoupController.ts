@@ -34,19 +34,19 @@ const mediasoupStart = async () => {
       socket.emit("newProducers", producerList);
     });
 
-    socket.on("get_router_rtp_capabilities", (callback) => {
+    socket.on("get_router_rtp_capabilities", (_, callback) => {
       console.log("Get router RTP capabilities");
       try {
-        callback(room.getRtpCapabilities());
+        callback({ rtpCapabilities: room.getRtpCapabilities() });
       } catch (error) {
         callback({ error });
       }
     });
 
-    socket.on("create_webrtc_transport", async (callback) => {
+    socket.on("create_webrtc_transport", async (_, callback) => {
       try {
         const { params } = await room.createWebRtcTransport(socket.id);
-        callback(params);
+        callback({ params });
       } catch (error) {
         console.error(error);
         callback({ error });
@@ -80,7 +80,7 @@ const mediasoupStart = async () => {
     // callback();
     // });
 
-    socket.on("get_room_info", (callback) => {
+    socket.on("get_room_info", (_, callback) => {
       callback(room.toJSON());
     });
 

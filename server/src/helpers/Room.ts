@@ -112,10 +112,10 @@ class Room {
     return new Promise(async (resolve) => {
       const producer = await this.peers.get(socketId)?.createProducer(producerTransportId, rtpParameters, kind);
       resolve(producer?.id);
-      this.broadcast(socketId, "newProducers", [
+      this.broadcast(socketId, "new_producers", [
         {
-          producer_id: producer?.id,
-          producer_socket_id: socketId,
+          producerId: producer?.id,
+          producerSocketId: socketId,
         },
       ]);
     });
@@ -143,7 +143,7 @@ class Room {
 
       consumer.on("producerclose", () => {
         this.peers.get(socketId)?.removeConsumer(consumer.id);
-        this.io.to(socketId).emit("consumerClosed", { consumer_id: consumer.id });
+        this.io.to(socketId).emit("consumer_closed", { consumerId: consumer.id });
       });
       return params;
     }

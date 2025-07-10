@@ -1,248 +1,328 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-import * as mediasoupClient from "mediasoup-client";
-import { RtpCapabilities, Device, IceParameters, IceCandidate, DtlsParameters, Transport } from "mediasoup-client/types";
+import { RtpCapabilities, Device, Transport, Consumer, Producer, ProducerOptions } from "mediasoup-client/types";
+// import * as mediasoupClient from "mediasoup-client";
 
-interface WebRtcTransportParams {
-  id: string;
-  iceParameters: IceParameters;
-  iceCandidates: IceCandidate[];
-  dtlsParameters: DtlsParameters;
-  error?: string;
-}
+import { copyURL, getDevices, createMediasoupDevice, socket, socketRequest, initTransport } from "./helper";
 
-const socket = io("https://localhost:9000/mediasoup");
 const SFU = () => {
-  // const [localStream, SetLocalStream] = useState<MediaStream | null>(null);
-
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [params, setParams] = useState<any>({
-    encoding: [
-      { rid: "r-1", maxBitrate: 100000, scalabilityMode: "S1T3" },
-      { rid: "r0", maxBitrate: 300000, scalabilityMode: "S1T3" },
-      { rid: "r1", maxBitrate: 900000, scalabilityMode: "S1T3" },
-    ],
-    codesOptions: {
-      videoGoogleStartBitrate: 999,
-    },
-  });
-
-  const [device, setDevice] = useState<Device | null>(null);
-  const [rtpCapabilities, setRtpCapabilities] = useState<RtpCapabilities | null>(null);
+  const buttonClass = "bg-white text-black font-semibold px-4 py-1 rounded-md";
+  const [name, setName] = useState("");
+  const [localVideoDevices, setLocalVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [localAudioDevices, setLocalAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [localMedia, setLocalMedia] = useState<MediaStream[]>([]);
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [producerTransport, setProducerTransport] = useState<Transport | null>(null);
   const [consumerTransport, setConsumerTransport] = useState<Transport | null>(null);
+  const [mediasoupDevice, setMediasoupDevice] = useState<Device | null>(null);
+  const [consumers, setConsumers] = useState<Map<string, Consumer>>(new Map());
+  const [producers, setProducers] = useState<Map<string, Producer>>(new Map());
+  const [producerLabel, setProducerLabel] = useState<Map<string, string>>(new Map());
 
-  const getLocalVideo = async () => {
-    const constraints = {
-      video: true,
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
-    };
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    const track = stream.getVideoTracks()[0];
-    setParams({
-      ...params,
-      track,
-    });
-    if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-    // SetLocalStream(stream);
+  const videoSelectRef = useRef<HTMLSelectElement | null>(null);
+  const audioSelectRef = useRef<HTMLSelectElement | null>(null);
+
+  const localMediaEl = useMemo(() => {
+    return localMedia.map((stream, index) => (
+      <video
+        key={index}
+        autoPlay
+        playsInline
+        muted
+        ref={(video) => {
+          if (video) video.srcObject = stream;
+        }}
+      />
+    ));
+  }, [localMedia]);
+
+  const videoOptions = useMemo(() => {
+    return localVideoDevices.map((device, index) => (
+      <option key={index} value={device.deviceId}>
+        {device.label}
+      </option>
+    ));
+  }, [localVideoDevices]);
+
+  const audioOptions = useMemo(() => {
+    return localAudioDevices.map((device, index) => (
+      <option key={index} value={device.deviceId}>
+        {device.label}
+      </option>
+    ));
+  }, [localAudioDevices]);
+
+  const getLocalDevices = async () => {
+    const devices = await getDevices();
+
+    const audio = [];
+    const video = [];
+    for (const device of devices) {
+      if (device.kind === "audioinput") audio.push(device);
+      else if (device.kind === "videoinput") video.push(device);
+    }
+    setLocalAudioDevices(audio);
+    setLocalVideoDevices(video);
   };
 
-  const getRtpCapabilities = async () => {
-    socket.emit("get_router_rtp_capabilities", (data: { rtpCapabilities: RtpCapabilities }) => {
-      console.log(`Router RTP capabilities... ${data.rtpCapabilities}`);
-      setRtpCapabilities(data.rtpCapabilities);
+  const closeProducer = (type: string) => {
+    if (!producerLabel.has(type)) {
+      console.log("There is no producer of this type ", type);
+      return;
+    }
+
+    const producerId = producerLabel.get(type);
+    console.log("close producer", producerId);
+
+    socket.emit("producer_closed", { producerId });
+    producers.get(producerId!)?.close();
+
+    setProducers((prev) => {
+      prev.delete(producerId!);
+      return prev;
     });
-  };
 
-  const createDevice = async () => {
-    try {
-      const dev = new mediasoupClient.Device();
-
-      if (rtpCapabilities) {
-        await dev.load({
-          routerRtpCapabilities: rtpCapabilities,
-        });
-        setDevice(dev);
-
-        console.log("RTP capabilities ", rtpCapabilities);
-      }
-    } catch (error) {
-      console.error(error);
-      // if (error.name === "UnsupportedError")
-      //   console.log("Browser not supported");
+    if (type !== "audioType") {
+      // let elem = document.getElementById(producer_id);
+      // elem.srcObject.getTracks().forEach(function (track) {
+      //   track.stop();
+      // });
+      // elem.parentNode.removeChild(elem);
     }
   };
 
-  const createSendTransport = async () => {
-    socket.emit("create_transport", { sender: true }, ({ params }: { params: WebRtcTransportParams }) => {
-      if (params.error) {
-        console.log(params.error);
+  const produce = async (type: string, deviceId: string = "") => {
+    let mediaConstraints = {};
+    let audio = false;
+    let screen = false;
+
+    switch (type) {
+      case "audioType":
+        mediaConstraints = {
+          audio: {
+            deviceId: deviceId,
+          },
+          video: false,
+        };
+        audio = true;
+        break;
+      case "videoType":
+        mediaConstraints = {
+          audio: false,
+          video: {
+            width: {
+              min: 640,
+              ideal: 1920,
+            },
+            height: {
+              min: 400,
+              ideal: 1080,
+            },
+            deviceId: deviceId,
+          },
+        };
+        break;
+      case "screenType":
+        mediaConstraints = false;
+        screen = true;
+        break;
+      default:
         return;
+    }
+
+    if (!mediasoupDevice?.canProduce("video") && !audio) {
+      console.error("Cannot produce video");
+      return;
+    }
+    if (producerLabel.has(type)) {
+      console.log("Producer already exists for this type ", type);
+      return;
+    }
+
+    console.log("Media constraints:", mediaConstraints);
+    try {
+      const stream = screen
+        ? await navigator.mediaDevices.getDisplayMedia()
+        : await navigator.mediaDevices.getUserMedia(mediaConstraints);
+      console.log(navigator.mediaDevices.getSupportedConstraints());
+
+      const track = audio ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
+      const params: ProducerOptions = { track };
+
+      if (!audio && !screen) {
+        params.encodings = [
+          {
+            rid: "r0",
+            maxBitrate: 100000,
+            //scaleResolutionDownBy: 10.0,
+            scalabilityMode: "S1T3",
+          },
+          {
+            rid: "r1",
+            maxBitrate: 300000,
+            scalabilityMode: "S1T3",
+          },
+          {
+            rid: "r2",
+            maxBitrate: 900000,
+            scalabilityMode: "S1T3",
+          },
+        ];
+        params.codecOptions = {
+          videoGoogleStartBitrate: 1000,
+        };
       }
-      console.log("params:", params);
 
-      if (device) {
-        const transport = device.createSendTransport(params);
+      const producer = await producerTransport?.produce(params);
+      if (producer) {
+        console.log("Producer:", producer);
+        setProducers((prev) => prev.set(producer.id, producer));
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        transport.on("connect", async ({ dtlsParameters }, callback, errback: any) => {
-          try {
-            console.log("----------> producer transport has connected");
-            socket.emit("transport_connect", {
-              transportId: transport.id,
-              dtlsParameters: dtlsParameters,
-            });
+        if (!audio) {
+          setLocalMedia((prev) => [...prev, stream]);
+        }
 
-            callback();
-          } catch (error) {
-            console.log(error);
-            errback(error);
-          }
+        producer.on("trackended", () => {
+          closeProducer(type);
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        transport.on("produce", (parameters, callback, errback: any) => {
-          console.log("----------> transport-produce");
-          console.log(parameters);
-          try {
-            socket.emit(
-              "transport_produce",
-              {
-                // transportId: transport.id,
-                kind: parameters.kind,
-                rtpParameters: parameters.rtpParameters,
-                // appData: parameters.appData,
-              },
-              ({ id }: { id: string }) => {
-                callback({ id });
-              }
-            );
-          } catch (error) {
-            console.log(error);
-            errback(error);
+        producer.on("@close", () => {
+          console.log("Closing producer");
+          if (!audio) {
+            for (const track of stream.getTracks()) {
+              track.stop();
+            }
           }
+
+          setProducers((prev) => {
+            prev.delete(producer.id);
+            return prev;
+          });
         });
-
-        setProducerTransport(transport);
       }
-    });
+    } catch (error) {
+      console.error("Produce Error:", error);
+    }
   };
 
-  const connectSendTransportAndProduce = async () => {
-    const localProducer = await producerTransport?.produce(params);
+  // const removeConsumer = (consumerId: string) => {
+  // };
 
-    localProducer?.on("trackended", () => {
-      console.log("Track ended");
-    });
+  const exit = (offline = false) => {
+    const clean = () => {
+      consumerTransport?.close();
+      producerTransport?.close();
+      socket.off("disconnect");
+      socket.off("new_producers");
+      socket.off("consumer_closed");
+    };
 
-    localProducer?.on("transportclose", () => {
-      console.log("Transport close");
-    });
+    if (!offline) {
+      socketRequest("exit_room")
+        .then((e) => console.log(e))
+        .catch((e) => console.warn(e))
+        .finally(() => clean());
+    } else {
+      clean();
+    }
   };
 
-  const createRecvTransport = async () => {
-    socket.emit("create_transport", { sender: false }, ({ params }: { params: WebRtcTransportParams }) => {
-      if (params.error) return;
-
-      const transport = device?.createRecvTransport(params);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      transport?.on("connect", async ({ dtlsParameters }, callback, errback: any) => {
-        try {
-          socket.emit("connect_consumer_transport", { dtlsParameters });
-          callback();
-        } catch (error) {
-          console.error(error);
-          errback(error);
-        }
-      });
-
-      if (transport) {
-        console.log("Recv transport created", transport);
-        setConsumerTransport(transport);
-      }
-    });
-  };
-
-  const connectRecvTransportAndConsume = async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    socket.emit("consume_media", { rtpCapabilities: device?.rtpCapabilities }, async ({ params }: any) => {
-      if (params.error) return;
-
-      const consumer = await consumerTransport?.consume({
-        id: params.id,
-        producerId: params.producerId,
-        kind: params.kind,
-        rtpParameters: params.rtpParameters,
-      });
-
-      // console.log(consumer);
-      if (consumer) {
-        const { track } = consumer;
-
-        if (remoteVideoRef.current) {
-          console.log("setting remote video ref", track);
-          remoteVideoRef.current.srcObject = new MediaStream([track]);
-        }
-        socket.emit("resume_paused_consumer");
-        console.log("Recv transport connected", consumer);
-      }
-    });
-  };
-
+  // INIT
   useEffect(() => {
-    if (socket.connected) console.log(socket.id);
+    (async () => {
+      const nm = window.localStorage.getItem("name");
+      if (nm) setName(nm);
+
+      await getLocalDevices();
+    })();
+
+    socket.on("consumer_closed", ({ consumerId }: { consumerId: string }) => {
+      console.log("closing consumer:", consumerId);
+      // TODO: REMOVE CONSUMER
+    });
+
+    socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
+      console.log("New producers:", data);
+
+      // for (const { producerId } of data) {
+      // TODO: CONSUME
+      // await consume(producerId);
+      // }
+    });
+
+    socket.on("disconnect", () => {
+      exit(true);
+    });
   }, []);
 
+  // JOIN
+  useEffect(() => {
+    (async () => {
+      if (!mediasoupDevice) {
+        const json = await socketRequest("join", { name });
+        console.log("Joined room", json);
+
+        const data = (await socketRequest("get_router_rtp_capabilities")) as {
+          rtpCapabilities: RtpCapabilities;
+          error?: unknown;
+        };
+        if (data.error) {
+          console.error(data.error);
+          return;
+        }
+
+        const dev = await createMediasoupDevice(data.rtpCapabilities);
+        if (!dev) {
+          console.error("Failed to create Device");
+          return;
+        }
+        setMediasoupDevice(dev);
+      } else {
+        const res = await initTransport(mediasoupDevice);
+
+        if (!res) {
+          console.error("Failed to initialize transports");
+          return;
+        }
+
+        const { pTransport, cTransport } = res;
+        setProducerTransport(pTransport);
+        setConsumerTransport(cTransport);
+
+        socket.emit("get_producers");
+      }
+    })();
+  }, [name, mediasoupDevice]);
+
   return (
-    <div className="p-3">
-      <div className="flex gap-x-3">
-        <div>
-          <p className="text-3xl font-semibold">Local video</p>
-          <video ref={localVideoRef} id="localVideo" autoPlay muted className="bg-black w-[359px]" />
-        </div>
-        <div>
-          <p className="text-3xl font-semibold">Remote video</p>
-          <video ref={remoteVideoRef} id="remoteVideo" autoPlay className="bg-black w-[359px]" />
-        </div>
+    <div>
+      {/* CONTROLS */}
+      <div className="flex gap-x-4 mt-4 ml-6">
+        <button className={buttonClass}>Exit</button>
+        <button className={buttonClass} onClick={copyURL}>
+          Copy url
+        </button>
+        {/* <button className={buttonClass} onClick={getLocalDevices}>
+          Enumerate Devices
+        </button> */}
+        <button className={buttonClass} onClick={() => produce("audioType", audioSelectRef.current?.value)}>
+          toggle audio
+        </button>
+        <button className={buttonClass} onClick={() => produce("videoType", videoSelectRef.current?.value)}>
+          toggle video
+        </button>
+        <button className={buttonClass} onClick={() => produce("screenType")}>
+          toggle screen
+        </button>
+
+        <select ref={videoSelectRef}>{videoOptions}</select>
+        <select ref={audioSelectRef}>{audioOptions}</select>
       </div>
 
-      <div>
-        <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={getLocalVideo}>
-          0. Get local video
-        </button>
-        <div>
-          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={getRtpCapabilities}>
-            1. Get RTP capabilities
-          </button>
-          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={createDevice}>
-            2. Create Device
-          </button>
-        </div>
-        <div>
-          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={createSendTransport}>
-            3. Create send transport
-          </button>
-          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={connectSendTransportAndProduce}>
-            4. Connect send transport and produce
-          </button>
-          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={createRecvTransport}>
-            5. Create Recv transport
-          </button>
-          <button className="text-black bg-white font-medium mx-3 px-3 py-2 my-2" onClick={connectRecvTransportAndConsume}>
-            6. Connect Recv transport & consume
-          </button>
-        </div>
-      </div>
+      {/* LOCAL MEDIA */}
+      <div className="flex gap-x-4">{localMediaEl}</div>
     </div>
   );
 };
