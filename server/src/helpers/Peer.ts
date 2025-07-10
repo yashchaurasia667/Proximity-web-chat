@@ -103,6 +103,7 @@ class Peer {
         producerId,
         id: consumer?.id,
         rtpParameters: consumer?.rtpParameters,
+        kind: consumer?.kind,
         type: consumer?.type,
         producerPaused: consumer?.producerPaused,
       },

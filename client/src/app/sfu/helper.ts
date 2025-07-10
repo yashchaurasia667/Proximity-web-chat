@@ -1,13 +1,30 @@
 // import { Device, MediaKind } from "mediasoup-client/types";
 import { io } from "socket.io-client";
 import * as mediasoupClient from "mediasoup-client";
-import { DtlsParameters, IceCandidate, IceParameters, RtpCapabilities } from "mediasoup-client/types";
+import {
+  DtlsParameters,
+  IceCandidate,
+  IceParameters,
+  MediaKind,
+  RtpCapabilities,
+  RtpParameters,
+  Transport,
+} from "mediasoup-client/types";
 
 export type deviceParams = {
   id: string;
   iceParameters: IceParameters;
   iceCandidates: IceCandidate[];
   dtlsParameters: DtlsParameters;
+};
+
+export type consumeParams = {
+  producerId: string;
+  id: string;
+  rtpParameters: RtpParameters;
+  kind: MediaKind;
+  type: "simple" | "simulcast" | "svc" | "pipe";
+  producerPaused: boolean;
 };
 
 export const socket = io("https://localhost:9000/mediasoup");
@@ -51,7 +68,10 @@ export const createMediasoupDevice = async (routerRtpCapabilities: RtpCapabiliti
 
 export const initTransport = async (device: mediasoupClient.Device) => {
   // INIT PRODUCER TRANSPORT
-  const producerTransportRes = (await socketRequest("create_webrtc_transport")) as { params: deviceParams; error?: unknown };
+  const producerTransportRes = (await socketRequest("create_webrtc_transport")) as {
+    params: deviceParams;
+    error?: unknown;
+  };
   if (producerTransportRes.error) {
     console.error(producerTransportRes.error);
     return;
@@ -65,7 +85,11 @@ export const initTransport = async (device: mediasoupClient.Device) => {
 
   pTransport.on("produce", async ({ kind, rtpParameters }, callback, errorback) => {
     try {
-      const { producerId } = (await socketRequest("produce", { producerTransportId: pTransport.id, rtpParameters, kind })) as { producerId: string };
+      const { producerId } = (await socketRequest("produce", {
+        producerTransportId: pTransport.id,
+        rtpParameters,
+        kind,
+      })) as { producerId: string };
       callback({ id: producerId });
     } catch (error) {
       errorback(error as Error);
@@ -87,7 +111,10 @@ export const initTransport = async (device: mediasoupClient.Device) => {
   });
 
   // INIT CONSUMER TRANSPORT
-  const { params, error } = (await socketRequest("create_webrtc_transport")) as { params: deviceParams; error?: unknown };
+  const { params, error } = (await socketRequest("create_webrtc_transport")) as {
+    params: deviceParams;
+    error?: unknown;
+  };
   if (error) {
     console.error(error);
     return;
@@ -123,40 +150,38 @@ export const initTransport = async (device: mediasoupClient.Device) => {
 
 export const removeConsumer = () => {};
 
-// export const mediaTypes = {
-//   audio: "audioType",
-// };
+export const getConsumeStream = async (
+  producerId: string,
+  mediasoupDevice: mediasoupClient.Device,
+  consumerTransport: Transport
+) => {
+  const { rtpCapabilities } = mediasoupDevice;
+  const data = (await socketRequest("consume", {
+    consumerTransportId: consumerTransport.id,
+    rtpCapabilities,
+    producerId,
+  })) as consumeParams;
 
-// export const produce = async (type, deviceId: string, device: Device) => {
-//   let mediaConstraints = {};
-//   let audio = false;
-//   let video = false;
-//   let screen = false;
+  if (!data) {
+    console.log("Failed to consume");
+    return;
+  }
+  // console.log(data);
 
-//   switch (type) {
-//     case "audioType":
-//       mediaConstraints = {
-//         audio: {
-//           deviceId,
-//         },
-//         video: false,
-//       };
-//       audio = true;
-//       break;
-//     case "videoType":
-//       mediaConstraints = {
-//         video: {
-//           deviceId,
-//         },
-//         audio: false,
-//       };
-//       video = true;
-//       break;
-//     case "screenType":
-//       mediaConstraints = false;
-//       screen = true;
-//       break;
-//     default:
-//       return;
-//   }
-// };
+  // let codecOptions = {};
+  const consumer = await consumerTransport.consume({
+    id: data.id,
+    producerId,
+    kind: data.kind,
+    rtpParameters: data.rtpParameters,
+  });
+
+  const stream = new MediaStream();
+  stream.addTrack(consumer.track);
+
+  return {
+    consumer,
+    stream,
+    kind: data.kind,
+  };
+};

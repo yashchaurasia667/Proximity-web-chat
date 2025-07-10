@@ -5,18 +5,35 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { RtpCapabilities, Device, Transport, Consumer, Producer, ProducerOptions } from "mediasoup-client/types";
 // import * as mediasoupClient from "mediasoup-client";
 
-import { copyURL, getDevices, createMediasoupDevice, socket, socketRequest, initTransport } from "./helper";
+import {
+  copyURL,
+  getDevices,
+  createMediasoupDevice,
+  socket,
+  socketRequest,
+  initTransport,
+  getConsumeStream,
+} from "./helper";
 
 const SFU = () => {
   const buttonClass = "bg-white text-black font-semibold px-4 py-1 rounded-md";
+
+  const [videoOn, setVideoOn] = useState(false);
+  const [audioOn, setAudioOn] = useState(false);
+  const [screenOn, setScreenOn] = useState(false);
+
   const [name, setName] = useState("");
   const [localVideoDevices, setLocalVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [localAudioDevices, setLocalAudioDevices] = useState<MediaDeviceInfo[]>([]);
-  const [localMedia, setLocalMedia] = useState<MediaStream[]>([]);
+
+  const [localMedia, setLocalMedia] = useState<{ type: string; stream: MediaStream }[]>([]);
+
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+
   const [producerTransport, setProducerTransport] = useState<Transport | null>(null);
   const [consumerTransport, setConsumerTransport] = useState<Transport | null>(null);
   const [mediasoupDevice, setMediasoupDevice] = useState<Device | null>(null);
+
   const [consumers, setConsumers] = useState<Map<string, Consumer>>(new Map());
   const [producers, setProducers] = useState<Map<string, Producer>>(new Map());
   const [producerLabel, setProducerLabel] = useState<Map<string, string>>(new Map());
@@ -25,12 +42,13 @@ const SFU = () => {
   const audioSelectRef = useRef<HTMLSelectElement | null>(null);
 
   const localMediaEl = useMemo(() => {
-    return localMedia.map((stream, index) => (
+    return localMedia.map(({ stream, type }) => (
       <video
-        key={index}
+        key={type}
         autoPlay
         playsInline
         muted
+        className={type === "videoType" ? "rotate-y-180" : ""}
         ref={(video) => {
           if (video) video.srcObject = stream;
         }}
@@ -90,7 +108,15 @@ const SFU = () => {
       //   track.stop();
       // });
       // elem.parentNode.removeChild(elem);
+      setLocalMedia((prev) => {
+        return prev.filter((media) => media.type === type);
+      });
     }
+
+    setProducerLabel((prev) => {
+      prev.delete(type);
+      return prev;
+    });
   };
 
   const produce = async (type: string, deviceId: string = "") => {
@@ -181,7 +207,8 @@ const SFU = () => {
         setProducers((prev) => prev.set(producer.id, producer));
 
         if (!audio) {
-          setLocalMedia((prev) => [...prev, stream]);
+          setLocalMedia((prev) => [...prev, { type, stream }]);
+          // setLocalMedia();
         }
 
         producer.on("trackended", () => {
@@ -201,6 +228,8 @@ const SFU = () => {
             return prev;
           });
         });
+
+        setProducerLabel((prev) => prev.set(type, producer.id));
       }
     } catch (error) {
       console.error("Produce Error:", error);
@@ -209,6 +238,32 @@ const SFU = () => {
 
   // const removeConsumer = (consumerId: string) => {
   // };
+
+  const consume = async (producerId: string) => {
+    if (!mediasoupDevice || !consumerTransport) {
+      console.log("consumer Transport", consumerTransport);
+      console.log("media device:", mediasoupDevice);
+      console.log("No mediasoup device or consumer Transport");
+      return;
+    }
+
+    const res = await getConsumeStream(producerId, mediasoupDevice, consumerTransport);
+    console.log("hello");
+    if (!res) {
+      console.log("Failed to consume media");
+      return;
+    }
+
+    // console.log(res.kind);
+
+    if (res.kind === "video") {
+      console.log("setting remote streams");
+      setRemoteStreams((prev) => prev.set(res.consumer.id, res.stream));
+    } else {
+    }
+
+    setConsumers((prev) => prev.set(res.consumer.id, res.consumer));
+  };
 
   const exit = (offline = false) => {
     const clean = () => {
@@ -237,29 +292,12 @@ const SFU = () => {
 
       await getLocalDevices();
     })();
-
-    socket.on("consumer_closed", ({ consumerId }: { consumerId: string }) => {
-      console.log("closing consumer:", consumerId);
-      // TODO: REMOVE CONSUMER
-    });
-
-    socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
-      console.log("New producers:", data);
-
-      // for (const { producerId } of data) {
-      // TODO: CONSUME
-      // await consume(producerId);
-      // }
-    });
-
-    socket.on("disconnect", () => {
-      exit(true);
-    });
   }, []);
 
   // JOIN
   useEffect(() => {
     (async () => {
+      if (!name) return;
       if (!mediasoupDevice) {
         const json = await socketRequest("join", { name });
         console.log("Joined room", json);
@@ -280,6 +318,7 @@ const SFU = () => {
         }
         setMediasoupDevice(dev);
       } else {
+        console.log("Creating transports");
         const res = await initTransport(mediasoupDevice);
 
         if (!res) {
@@ -288,6 +327,10 @@ const SFU = () => {
         }
 
         const { pTransport, cTransport } = res;
+
+        // console.log("producerTransport", pTransport);
+        // console.log("consumerTransport", cTransport);
+
         setProducerTransport(pTransport);
         setConsumerTransport(cTransport);
 
@@ -296,10 +339,29 @@ const SFU = () => {
     })();
   }, [name, mediasoupDevice]);
 
+  useEffect(() => {
+    socket.on("consumer_closed", ({ consumerId }: { consumerId: string }) => {
+      console.log("closing consumer:", consumerId);
+      // TODO: REMOVE CONSUMER
+    });
+
+    socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
+      console.log("New producers:", data);
+
+      for (const { producerId } of data) {
+        await consume(producerId);
+      }
+    });
+
+    socket.on("disconnect", () => {
+      exit(true);
+    });
+  }, [consumerTransport]);
+
   return (
     <div>
       {/* CONTROLS */}
-      <div className="flex gap-x-4 mt-4 ml-6">
+      <div className="flex gap-x-4 my-4 ml-6">
         <button className={buttonClass}>Exit</button>
         <button className={buttonClass} onClick={copyURL}>
           Copy url
@@ -307,14 +369,35 @@ const SFU = () => {
         {/* <button className={buttonClass} onClick={getLocalDevices}>
           Enumerate Devices
         </button> */}
-        <button className={buttonClass} onClick={() => produce("audioType", audioSelectRef.current?.value)}>
-          toggle audio
+        <button
+          className={buttonClass}
+          onClick={() => {
+            if (!audioOn) produce("audioType", audioSelectRef.current?.value);
+            else closeProducer("audioType");
+            setAudioOn((prev) => !prev);
+          }}
+        >
+          {audioOn ? "Close mic" : "Open mic"}
         </button>
-        <button className={buttonClass} onClick={() => produce("videoType", videoSelectRef.current?.value)}>
-          toggle video
+        <button
+          className={buttonClass}
+          onClick={() => {
+            if (!videoOn) produce("videoType", videoSelectRef.current?.value);
+            else closeProducer("videoType");
+            setVideoOn((prev) => !prev);
+          }}
+        >
+          {videoOn ? "Close camera" : "Open camera"}
         </button>
-        <button className={buttonClass} onClick={() => produce("screenType")}>
-          toggle screen
+        <button
+          className={buttonClass}
+          onClick={() => {
+            if (!screenOn) produce("screenType");
+            else closeProducer("screenType");
+            setScreenOn((prev) => !prev);
+          }}
+        >
+          {screenOn ? "Close screen" : "Open screen"}
         </button>
 
         <select ref={videoSelectRef}>{videoOptions}</select>
