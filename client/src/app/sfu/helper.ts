@@ -8,6 +8,7 @@ import {
   MediaKind,
   RtpCapabilities,
   RtpParameters,
+  Device,
   Transport,
 } from "mediasoup-client/types";
 
@@ -123,8 +124,9 @@ export const initTransport = async (device: mediasoupClient.Device) => {
   const cTransport = device.createRecvTransport(params);
 
   cTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
-    socketRequest("connectTransport", {
-      transport_id: cTransport.id,
+    // console.log("connect transport");
+    socketRequest("connect_transport", {
+      transportId: cTransport.id,
       dtlsParameters,
     })
       .then(callback)
@@ -148,13 +150,7 @@ export const initTransport = async (device: mediasoupClient.Device) => {
   return { pTransport, cTransport };
 };
 
-export const removeConsumer = () => {};
-
-export const getConsumeStream = async (
-  producerId: string,
-  mediasoupDevice: mediasoupClient.Device,
-  consumerTransport: Transport
-) => {
+export const getConsumeStream = async (producerId: string, mediasoupDevice: Device, consumerTransport: Transport) => {
   const { rtpCapabilities } = mediasoupDevice;
   const data = (await socketRequest("consume", {
     consumerTransportId: consumerTransport.id,
@@ -166,22 +162,25 @@ export const getConsumeStream = async (
     console.log("Failed to consume");
     return;
   }
-  // console.log(data);
 
-  // let codecOptions = {};
+  const { id, kind, rtpParameters } = data;
+  // console.log(consumerTransport.connectionState);
+
   const consumer = await consumerTransport.consume({
-    id: data.id,
+    id,
     producerId,
-    kind: data.kind,
-    rtpParameters: data.rtpParameters,
+    kind,
+    rtpParameters,
   });
+  // console.log("get consume stream");
 
-  const stream = new MediaStream();
-  stream.addTrack(consumer.track);
+  console.log("consume tracks", consumer.track);
+
+  // const stream = new MediaStream();
+  // stream.addTrack(consumer.track);
 
   return {
     consumer,
-    stream,
     kind: data.kind,
   };
 };

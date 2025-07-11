@@ -31,7 +31,7 @@ const mediasoupStart = async () => {
     socket.on("get_producers", () => {
       console.log("Get Producers:", { name: `${room.getPeers().get(socket.id)?.name}` });
       const producerList = room.getProducerListForPeer();
-      socket.emit("newProducers", producerList);
+      socket.emit("new_producers", producerList);
     });
 
     socket.on("get_router_rtp_capabilities", (_, callback) => {
@@ -55,6 +55,7 @@ const mediasoupStart = async () => {
 
     socket.on("connect_transport", async ({ transportId, dtlsParameters }, callback) => {
       try {
+        console.log("connect transport", transportId, dtlsParameters);
         await room.connectPeerTransport(socket.id, transportId, dtlsParameters);
         callback("success");
       } catch (error) {

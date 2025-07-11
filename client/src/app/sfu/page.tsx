@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { RtpCapabilities, Device, Transport, Consumer, Producer, ProducerOptions } from "mediasoup-client/types";
 // import * as mediasoupClient from "mediasoup-client";
@@ -27,13 +27,13 @@ const SFU = () => {
   const [localAudioDevices, setLocalAudioDevices] = useState<MediaDeviceInfo[]>([]);
 
   const [localMedia, setLocalMedia] = useState<{ type: string; stream: MediaStream }[]>([]);
-
-  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+  const [remoteStreams, setRemoteStreams] = useState<{ id: string; stream: MediaStream }[]>([]);
 
   const [producerTransport, setProducerTransport] = useState<Transport | null>(null);
   const [consumerTransport, setConsumerTransport] = useState<Transport | null>(null);
   const [mediasoupDevice, setMediasoupDevice] = useState<Device | null>(null);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [consumers, setConsumers] = useState<Map<string, Consumer>>(new Map());
   const [producers, setProducers] = useState<Map<string, Producer>>(new Map());
   const [producerLabel, setProducerLabel] = useState<Map<string, string>>(new Map());
@@ -44,12 +44,13 @@ const SFU = () => {
   const localMediaEl = useMemo(() => {
     return localMedia.map(({ stream, type }) => (
       <video
-        key={type}
+        key={stream.id}
         autoPlay
         playsInline
         muted
         className={type === "videoType" ? "rotate-y-180" : ""}
         ref={(video) => {
+          console.log(stream);
           if (video) video.srcObject = stream;
         }}
       />
@@ -71,6 +72,28 @@ const SFU = () => {
       </option>
     ));
   }, [localAudioDevices]);
+
+  const remoteMediaEl = useMemo(() => {
+    return remoteStreams.map(({ id, stream }) => (
+      <video
+        key={id}
+        autoPlay
+        playsInline
+        muted
+        className="bg-black"
+        ref={(video) => {
+          console.log(stream.id);
+          if (video) {
+            video.srcObject = stream;
+            video
+              .play()
+              .then(() => (video.muted = false))
+              .catch((err) => console.error("play error", err));
+          }
+        }}
+      ></video>
+    ));
+  }, [remoteStreams]);
 
   const getLocalDevices = async () => {
     const devices = await getDevices();
@@ -98,24 +121,21 @@ const SFU = () => {
     producers.get(producerId!)?.close();
 
     setProducers((prev) => {
-      prev.delete(producerId!);
-      return prev;
+      const newMap = new Map(prev);
+      newMap.delete(producerId!);
+      return newMap;
     });
 
     if (type !== "audioType") {
-      // let elem = document.getElementById(producer_id);
-      // elem.srcObject.getTracks().forEach(function (track) {
-      //   track.stop();
-      // });
-      // elem.parentNode.removeChild(elem);
       setLocalMedia((prev) => {
-        return prev.filter((media) => media.type === type);
+        return prev.filter((media) => media.type !== type);
       });
     }
 
     setProducerLabel((prev) => {
-      prev.delete(type);
-      return prev;
+      const newMap = new Map(prev);
+      newMap.delete(type);
+      return newMap;
     });
   };
 
@@ -167,14 +187,15 @@ const SFU = () => {
       return;
     }
 
-    console.log("Media constraints:", mediaConstraints);
+    // console.log("Media constraints:", mediaConstraints);
     try {
       const stream = screen
         ? await navigator.mediaDevices.getDisplayMedia()
         : await navigator.mediaDevices.getUserMedia(mediaConstraints);
-      console.log(navigator.mediaDevices.getSupportedConstraints());
+      // console.log(navigator.mediaDevices.getSupportedConstraints());
 
       const track = audio ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
+      if (!track) throw new Error("No media track available");
       const params: ProducerOptions = { track };
 
       if (!audio && !screen) {
@@ -203,10 +224,15 @@ const SFU = () => {
 
       const producer = await producerTransport?.produce(params);
       if (producer) {
-        console.log("Producer:", producer);
-        setProducers((prev) => prev.set(producer.id, producer));
+        // console.log("Producer:", producer);
+        setProducers((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(producer.id, producer);
+          return newMap;
+        });
 
         if (!audio) {
+          // console.log(stream);
           setLocalMedia((prev) => [...prev, { type, stream }]);
           // setLocalMedia();
         }
@@ -217,72 +243,118 @@ const SFU = () => {
 
         producer.on("@close", () => {
           console.log("Closing producer");
-          if (!audio) {
-            for (const track of stream.getTracks()) {
-              track.stop();
-            }
+          // if (!audio) {
+          for (const track of stream.getTracks()) {
+            track.stop();
           }
+          // }
 
           setProducers((prev) => {
-            prev.delete(producer.id);
-            return prev;
+            const newMap = new Map(prev);
+            newMap.delete(producer.id);
+            return newMap;
           });
         });
 
-        setProducerLabel((prev) => prev.set(type, producer.id));
+        setProducerLabel((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(type, producer.id);
+          return newMap;
+        });
       }
     } catch (error) {
       console.error("Produce Error:", error);
     }
   };
 
-  // const removeConsumer = (consumerId: string) => {
-  // };
+  const removeConsumer = (consumerId: string) => {
+    console.log("removing a consumer", consumerId);
+    setRemoteStreams((prev) => {
+      return prev.filter((media) => {
+        if (media.id === consumerId) {
+          media.stream.getTracks().forEach((track) => track.stop());
+          return false;
+        }
+        return true;
+      });
+    });
 
-  const consume = async (producerId: string) => {
-    if (!mediasoupDevice || !consumerTransport) {
-      console.log("consumer Transport", consumerTransport);
-      console.log("media device:", mediasoupDevice);
-      console.log("No mediasoup device or consumer Transport");
-      return;
-    }
-
-    const res = await getConsumeStream(producerId, mediasoupDevice, consumerTransport);
-    console.log("hello");
-    if (!res) {
-      console.log("Failed to consume media");
-      return;
-    }
-
-    // console.log(res.kind);
-
-    if (res.kind === "video") {
-      console.log("setting remote streams");
-      setRemoteStreams((prev) => prev.set(res.consumer.id, res.stream));
-    } else {
-    }
-
-    setConsumers((prev) => prev.set(res.consumer.id, res.consumer));
+    setConsumers((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(consumerId);
+      return newMap;
+    });
   };
 
-  const exit = (offline = false) => {
-    const clean = () => {
-      consumerTransport?.close();
-      producerTransport?.close();
-      socket.off("disconnect");
-      socket.off("new_producers");
-      socket.off("consumer_closed");
-    };
+  const consume = useCallback(
+    async (producerId: string) => {
+      if (!mediasoupDevice || !consumerTransport) {
+        console.log("consumer Transport:", consumerTransport);
+        console.log("media device:", mediasoupDevice);
+        console.log("consumer transport connection state:", consumerTransport?.connectionState);
 
-    if (!offline) {
-      socketRequest("exit_room")
-        .then((e) => console.log(e))
-        .catch((e) => console.warn(e))
-        .finally(() => clean());
-    } else {
-      clean();
-    }
-  };
+        console.log("No mediasoup device or consumer Transport");
+        console.log("");
+        return;
+      }
+
+      const res = await getConsumeStream(producerId, mediasoupDevice, consumerTransport);
+      if (!res) {
+        console.log("Failed to consume media");
+        return;
+      }
+
+      // console.log("Remote consumer created:", res.consumer.id);
+      // console.log("Remote stream tracks:", res.stream.getTracks());
+      // res.stream.getTracks().forEach((t) => console.log("Track:", t.kind, "enabled:", t.enabled));
+      // console.log("stream active", res.stream.active);
+
+      // console.log("remote stream id:", res.stream.id);
+      const stream = new MediaStream();
+      stream.addTrack(res.consumer.track);
+      setRemoteStreams((prev) => [...prev, { id: res.consumer.id, stream: stream }]);
+
+      res.consumer.on("trackended", () => {
+        console.log("track ended");
+        removeConsumer(res.consumer.id);
+      });
+
+      res.consumer.on("transportclose", () => {
+        console.log("consumer transport closed");
+        removeConsumer(res.consumer.id);
+      });
+
+      setConsumers((prev) => {
+        // prev.set(res.consumer.id, res.consumer)
+        const newMap = new Map(prev);
+        newMap.set(res.consumer.id, res.consumer);
+        return newMap;
+      });
+    },
+    [consumerTransport, mediasoupDevice]
+  );
+
+  const clean = useCallback(() => {
+    consumerTransport?.close();
+    producerTransport?.close();
+    socket.off("disconnect");
+    socket.off("new_producers");
+    socket.off("consumer_closed");
+  }, [consumerTransport, producerTransport]);
+
+  const exit = useCallback(
+    (offline = false) => {
+      if (!offline) {
+        socketRequest("exit_room")
+          .then((e) => console.log(e))
+          .catch((e) => console.warn(e))
+          .finally(() => clean());
+      } else {
+        clean();
+      }
+    },
+    [clean]
+  );
 
   // INIT
   useEffect(() => {
@@ -298,6 +370,7 @@ const SFU = () => {
   useEffect(() => {
     (async () => {
       if (!name) return;
+
       if (!mediasoupDevice) {
         const json = await socketRequest("join", { name });
         console.log("Joined room", json);
@@ -316,53 +389,66 @@ const SFU = () => {
           console.error("Failed to create Device");
           return;
         }
-        setMediasoupDevice(dev);
-      } else {
-        console.log("Creating transports");
-        const res = await initTransport(mediasoupDevice);
 
+        setMediasoupDevice(dev);
+      } else if (mediasoupDevice && !consumerTransport) {
+        // console.log("Creating transports");
+        // console.log(mediasoupDevice);
+        const res = await initTransport(mediasoupDevice);
         if (!res) {
           console.error("Failed to initialize transports");
           return;
         }
+        // console.log(res);
 
-        const { pTransport, cTransport } = res;
-
-        // console.log("producerTransport", pTransport);
-        // console.log("consumerTransport", cTransport);
-
-        setProducerTransport(pTransport);
-        setConsumerTransport(cTransport);
+        setProducerTransport(res.pTransport);
+        setConsumerTransport(res.cTransport);
 
         socket.emit("get_producers");
       }
     })();
-  }, [name, mediasoupDevice]);
+  }, [name, mediasoupDevice, consumerTransport]);
 
+  // INIT SOCKETS
   useEffect(() => {
-    socket.on("consumer_closed", ({ consumerId }: { consumerId: string }) => {
+    const handleConsumerClosed = ({ consumerId }: { consumerId: string }) => {
       console.log("closing consumer:", consumerId);
       // TODO: REMOVE CONSUMER
-    });
+    };
+    if (consumerTransport) {
+      socket.on("consumer_closed", handleConsumerClosed);
 
-    socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
-      console.log("New producers:", data);
+      socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
+        // if (data.length === 0) return;
 
-      for (const { producerId } of data) {
-        await consume(producerId);
-      }
-    });
+        console.log("New producers:", data);
+        for (const { producerId } of data) {
+          await consume(producerId);
+        }
+      });
 
-    socket.on("disconnect", () => {
-      exit(true);
-    });
-  }, [consumerTransport]);
+      socket.on("disconnect", () => {
+        exit(true);
+      });
+
+      return () => {
+        clean();
+      };
+    }
+  }, [clean, consume, consumerTransport, exit]);
 
   return (
     <div>
       {/* CONTROLS */}
       <div className="flex gap-x-4 my-4 ml-6">
-        <button className={buttonClass}>Exit</button>
+        <button
+          className={buttonClass}
+          onClick={() => {
+            exit();
+          }}
+        >
+          Exit
+        </button>
         <button className={buttonClass} onClick={copyURL}>
           Copy url
         </button>
@@ -406,6 +492,9 @@ const SFU = () => {
 
       {/* LOCAL MEDIA */}
       <div className="flex gap-x-4">{localMediaEl}</div>
+
+      {/* REMOTE MEDIA */}
+      <div className="flex gap-x-4 gap-y-4">{remoteMediaEl}</div>
     </div>
   );
 };
