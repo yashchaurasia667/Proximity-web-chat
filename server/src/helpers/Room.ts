@@ -74,6 +74,8 @@ class Room {
   async createWebRtcTransport(socketId: string) {
     const transport = await this.router.createWebRtcTransport(config.mediasoup.webRtcTransportOptions);
 
+    console.log(transport);
+
     transport.on("dtlsstatechange", (dtlsState) => {
       if (dtlsState === "closed") {
         console.log("Transport closed");
@@ -119,16 +121,6 @@ class Room {
         },
       ]);
     });
-
-    // const producer = await this.peers.get(socketId)?.createProducer(producerTransportId, rtpParameters, kind);
-    // if (producer) {
-    //   this.broadcast(socketId, "newProducers", [
-    //     {
-    //       producerId: producer.id,
-    //       producerSocketId: socketId,
-    //     },
-    //   ]);
-    // }
   }
 
   async consume(socketId: string, consumerTransportId: string, producerId: string, rtpCapabilities: RtpCapabilities) {

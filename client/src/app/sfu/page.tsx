@@ -50,7 +50,6 @@ const SFU = () => {
         muted
         className={type === "videoType" ? "rotate-y-180" : ""}
         ref={(video) => {
-          console.log(stream);
           if (video) video.srcObject = stream;
         }}
       />
@@ -186,6 +185,10 @@ const SFU = () => {
       console.log("Producer already exists for this type ", type);
       return;
     }
+    if (!producerTransport) {
+      console.error("no producer transport");
+      return;
+    }
 
     // console.log("Media constraints:", mediaConstraints);
     try {
@@ -222,46 +225,48 @@ const SFU = () => {
         };
       }
 
-      const producer = await producerTransport?.produce(params);
-      if (producer) {
-        // console.log("Producer:", producer);
+      const producer = await producerTransport.produce(params);
+      if (!producer) {
+        console.log("no producer");
+        return;
+      }
+      // console.log("Producer:", producer);
+      setProducers((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(producer.id, producer);
+        return newMap;
+      });
+
+      if (!audio) {
+        // console.log(stream);
+        setLocalMedia((prev) => [...prev, { type, stream }]);
+        // setLocalMedia();
+      }
+
+      producer.on("trackended", () => {
+        closeProducer(type);
+      });
+
+      producer.on("@close", () => {
+        console.log("Closing producer");
+        // if (!audio) {
+        for (const track of stream.getTracks()) {
+          track.stop();
+        }
+        // }
+
         setProducers((prev) => {
           const newMap = new Map(prev);
-          newMap.set(producer.id, producer);
+          newMap.delete(producer.id);
           return newMap;
         });
+      });
 
-        if (!audio) {
-          // console.log(stream);
-          setLocalMedia((prev) => [...prev, { type, stream }]);
-          // setLocalMedia();
-        }
-
-        producer.on("trackended", () => {
-          closeProducer(type);
-        });
-
-        producer.on("@close", () => {
-          console.log("Closing producer");
-          // if (!audio) {
-          for (const track of stream.getTracks()) {
-            track.stop();
-          }
-          // }
-
-          setProducers((prev) => {
-            const newMap = new Map(prev);
-            newMap.delete(producer.id);
-            return newMap;
-          });
-        });
-
-        setProducerLabel((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(type, producer.id);
-          return newMap;
-        });
-      }
+      setProducerLabel((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(type, producer.id);
+        return newMap;
+      });
     } catch (error) {
       console.error("Produce Error:", error);
     }
@@ -414,7 +419,9 @@ const SFU = () => {
     const handleConsumerClosed = ({ consumerId }: { consumerId: string }) => {
       console.log("closing consumer:", consumerId);
       // TODO: REMOVE CONSUMER
+      removeConsumer(consumerId);
     };
+
     if (consumerTransport) {
       socket.on("consumer_closed", handleConsumerClosed);
 

@@ -45,6 +45,7 @@ const mediasoupStart = async () => {
 
     socket.on("create_webrtc_transport", async (_, callback) => {
       try {
+        console.log("creating webrtc transport");
         const { params } = await room.createWebRtcTransport(socket.id);
         callback({ params });
       } catch (error) {
@@ -55,7 +56,7 @@ const mediasoupStart = async () => {
 
     socket.on("connect_transport", async ({ transportId, dtlsParameters }, callback) => {
       try {
-        console.log("connect transport", transportId, dtlsParameters);
+        console.log("connect transport\n", transportId, dtlsParameters);
         await room.connectPeerTransport(socket.id, transportId, dtlsParameters);
         callback("success");
       } catch (error) {
@@ -66,11 +67,13 @@ const mediasoupStart = async () => {
 
     socket.on("produce", async ({ producerTransportId, rtpParameters, kind }, callback) => {
       const producerId = await room.produce(socket.id, producerTransportId, rtpParameters, kind);
+      console.log("Transport has produced");
       callback({ producerId });
     });
 
     socket.on("consume", async ({ consumerTransportId, producerId, rtpCapabilities }, callback) => {
       const params = await room.consume(socket.id, consumerTransportId, producerId, rtpCapabilities);
+      console.log("consumed");
       if (params) {
         callback(params);
       }

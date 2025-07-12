@@ -45,11 +45,12 @@ class Peer {
     this.transports.set(id, transport);
   }
 
-  async connectTransport(id: string, dtlsParameters: DtlsParameters) {
-    const transport = this.transports.get(id);
+  async connectTransport(transportId: string, dtlsParameters: DtlsParameters) {
+    const transport = this.transports.get(transportId);
     if (transport) {
       await transport.connect({ dtlsParameters });
-      this.transports.set(id, transport);
+      this.transports.set(transportId, transport);
+      console.log("Transport has been connected");
     }
   }
 

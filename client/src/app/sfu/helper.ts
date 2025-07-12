@@ -78,37 +78,46 @@ export const initTransport = async (device: mediasoupClient.Device) => {
     return;
   }
 
-  const pTransport = device.createSendTransport(producerTransportRes.params);
+  console.log("send transport params", producerTransportRes.params);
+  const { id, iceCandidates, iceParameters, dtlsParameters } = producerTransportRes.params;
+
+  const pTransport = device.createSendTransport({
+    id,
+    iceCandidates,
+    iceParameters,
+    dtlsParameters,
+  });
 
   pTransport.on("connect", async ({ dtlsParameters }, callback, errorback) => {
-    socketRequest("connect_transport", { transportId: pTransport.id, dtlsParameters }).then(callback).catch(errorback);
+    console.log("produce connect");
+    try {
+      await socketRequest("connect_transport", { transportId: pTransport.id, dtlsParameters });
+      callback();
+    } catch (error) {
+      console.log(error);
+      errorback(error as Error);
+    }
   });
 
   pTransport.on("produce", async ({ kind, rtpParameters }, callback, errorback) => {
     try {
+      console.log("transport is producing");
       const { producerId } = (await socketRequest("produce", {
         producerTransportId: pTransport.id,
         rtpParameters,
         kind,
       })) as { producerId: string };
+
+      console.log("producer id", producerId);
       callback({ id: producerId });
     } catch (error) {
+      console.log(error);
       errorback(error as Error);
     }
   });
 
   pTransport.on("connectionstatechange", (state) => {
-    switch (state) {
-      case "connecting":
-        break;
-      case "connected":
-        break;
-      case "failed":
-        pTransport.close();
-        break;
-      default:
-        break;
-    }
+    console.log("Producer transport connection state:", state);
   });
 
   // INIT CONSUMER TRANSPORT
@@ -123,28 +132,22 @@ export const initTransport = async (device: mediasoupClient.Device) => {
 
   const cTransport = device.createRecvTransport(params);
 
-  cTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
-    // console.log("connect transport");
-    socketRequest("connect_transport", {
-      transportId: cTransport.id,
-      dtlsParameters,
-    })
-      .then(callback)
-      .catch(errback);
+  cTransport.on("connect", async ({ dtlsParameters }, callback, errback) => {
+    console.log("consumer connect");
+    try {
+      const data = await socketRequest("connect_transport", {
+        transportId: cTransport.id,
+        dtlsParameters,
+      });
+      console.log(data);
+      callback();
+    } catch (error) {
+      errback(error as Error);
+    }
   });
 
   cTransport.on("connectionstatechange", (state) => {
-    switch (state) {
-      case "connecting":
-        break;
-      case "connected":
-        break;
-      case "failed":
-        cTransport.close();
-        break;
-      default:
-        break;
-    }
+    console.log("consumer state changed:", state);
   });
 
   return { pTransport, cTransport };
@@ -174,6 +177,7 @@ export const getConsumeStream = async (producerId: string, mediasoupDevice: Devi
   });
   // console.log("get consume stream");
 
+  console.log("consumer transport state: ", consumerTransport.connectionState);
   console.log("consume tracks", consumer.track);
 
   // const stream = new MediaStream();
