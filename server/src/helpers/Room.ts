@@ -71,7 +71,7 @@ class Room {
     return this.router.rtpCapabilities;
   }
 
-  async createWebRtcTransport(socketId: string) {
+  async CreateWebRtcTransport(socketId: string) {
     const transport = await this.router.createWebRtcTransport(config.mediasoup.webRtcTransportOptions);
 
     console.log(transport);

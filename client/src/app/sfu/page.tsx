@@ -342,9 +342,9 @@ const SFU = () => {
   const clean = useCallback(() => {
     consumerTransport?.close();
     producerTransport?.close();
-    socket.off("disconnect");
-    socket.off("new_producers");
-    socket.off("consumer_closed");
+    socket.removeAllListeners("disconnect");
+    socket.removeAllListeners("new_producers");
+    socket.removeAllListeners("consumer_closed");
   }, [consumerTransport, producerTransport]);
 
   const exit = useCallback(
@@ -396,7 +396,14 @@ const SFU = () => {
         }
 
         setMediasoupDevice(dev);
-      } else if (mediasoupDevice && !consumerTransport) {
+      }
+    })();
+  }, [name, mediasoupDevice, consumerTransport]);
+
+  // INIT CONSUMER TRANSPORT
+  useEffect(() => {
+    (async () => {
+      if (mediasoupDevice && !consumerTransport) {
         // console.log("Creating transports");
         // console.log(mediasoupDevice);
         const res = await initTransport(mediasoupDevice);
@@ -412,18 +419,15 @@ const SFU = () => {
         socket.emit("get_producers");
       }
     })();
-  }, [name, mediasoupDevice, consumerTransport]);
+  }, [consumerTransport, mediasoupDevice]);
 
   // INIT SOCKETS
   useEffect(() => {
-    const handleConsumerClosed = ({ consumerId }: { consumerId: string }) => {
-      console.log("closing consumer:", consumerId);
-      // TODO: REMOVE CONSUMER
-      removeConsumer(consumerId);
-    };
-
     if (consumerTransport) {
-      socket.on("consumer_closed", handleConsumerClosed);
+      socket.on("consumer_closed", ({ consumerId }: { consumerId: string }) => {
+        console.log("closing consumer:", consumerId);
+        removeConsumer(consumerId);
+      });
 
       socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
         // if (data.length === 0) return;

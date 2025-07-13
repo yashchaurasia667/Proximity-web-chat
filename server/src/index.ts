@@ -27,5 +27,5 @@ mediasoupStart();
 // RTCStart();
 
 server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`\nServer listening on port ${PORT}\n`);
 });

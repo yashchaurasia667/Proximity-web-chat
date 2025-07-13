@@ -23,19 +23,19 @@ const mediasoupStart = async () => {
 
   peers.on("connection", (socket) => {
     socket.on("join", ({ name }, callback) => {
-      console.log(`${socket.id} has joined the room`);
+      console.log(`\n${socket.id} has joined the room`);
       room.addPeer(new Peer(socket.id, name));
       callback(room.toJSON());
     });
 
     socket.on("get_producers", () => {
-      console.log("Get Producers:", { name: `${room.getPeers().get(socket.id)?.name}` });
+      console.log("\nGet Producers:", { name: `${room.getPeers().get(socket.id)?.name}` });
       const producerList = room.getProducerListForPeer();
       socket.emit("new_producers", producerList);
     });
 
     socket.on("get_router_rtp_capabilities", (_, callback) => {
-      console.log("Get router RTP capabilities");
+      console.log("\nGet router RTP capabilities");
       try {
         callback({ rtpCapabilities: room.getRtpCapabilities() });
       } catch (error) {
@@ -45,7 +45,7 @@ const mediasoupStart = async () => {
 
     socket.on("create_webrtc_transport", async (_, callback) => {
       try {
-        console.log("creating webrtc transport");
+        console.log("\ncreating webrtc transport");
         const { params } = await room.createWebRtcTransport(socket.id);
         callback({ params });
       } catch (error) {
@@ -56,7 +56,7 @@ const mediasoupStart = async () => {
 
     socket.on("connect_transport", async ({ transportId, dtlsParameters }, callback) => {
       try {
-        console.log("connect transport\n", transportId, dtlsParameters);
+        console.log("\nconnect transport\n", transportId, dtlsParameters);
         await room.connectPeerTransport(socket.id, transportId, dtlsParameters);
         callback("success");
       } catch (error) {
@@ -67,13 +67,13 @@ const mediasoupStart = async () => {
 
     socket.on("produce", async ({ producerTransportId, rtpParameters, kind }, callback) => {
       const producerId = await room.produce(socket.id, producerTransportId, rtpParameters, kind);
-      console.log("Transport has produced");
+      console.log("\nTransport has produced");
       callback({ producerId });
     });
 
     socket.on("consume", async ({ consumerTransportId, producerId, rtpCapabilities }, callback) => {
       const params = await room.consume(socket.id, consumerTransportId, producerId, rtpCapabilities);
-      console.log("consumed");
+      console.log("\nconsumed");
       if (params) {
         callback(params);
       }
@@ -81,7 +81,7 @@ const mediasoupStart = async () => {
 
     // socket.on("resume", async (data, callback) => {
     //   await consumer.resume();
-    // callback();
+    //   callback();
     // });
 
     socket.on("get_room_info", (_, callback) => {
@@ -89,20 +89,20 @@ const mediasoupStart = async () => {
     });
 
     socket.on("producer_closed", ({ producerId }) => {
-      console.log("Producer close", { name: `${room.getPeers().get(socket.id)?.name}` });
+      console.log("\nProducer close", { name: `${room.getPeers().get(socket.id)?.name}` });
 
       room.closeProducer(socket.id, producerId);
     });
 
     socket.on("exit_room", (_, callback) => {
-      console.log("Exit room", { name: `${room.getPeers().get(socket.id)?.name}` });
+      console.log("\nExit room", { name: `${room.getPeers().get(socket.id)?.name}` });
 
       room.removePeer(socket.id);
       callback("successfully exited room");
     });
 
     socket.on("disconnect", () => {
-      console.log(`${socket.id} has disconnected`);
+      console.log(`\n${socket.id} has disconnected`);
     });
   });
 };
