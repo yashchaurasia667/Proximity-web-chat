@@ -18,6 +18,10 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/", (req, res) => {
+  res.json("Hello");
+});
+
 app.get("/ping", (req, res) => {
   res.json("pongg..");
 });

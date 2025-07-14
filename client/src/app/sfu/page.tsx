@@ -371,7 +371,7 @@ const SFU = () => {
     })();
   }, []);
 
-  // JOIN
+  // JOIN AND CREATE DEVICE
   useEffect(() => {
     (async () => {
       if (!name) return;
@@ -502,10 +502,16 @@ const SFU = () => {
       </div>
 
       {/* LOCAL MEDIA */}
-      <div className="flex gap-x-4">{localMediaEl}</div>
+      <div className="flex gap-x-4">
+        <div>Local media</div>
+        <div>{localMediaEl}</div>
+      </div>
 
       {/* REMOTE MEDIA */}
-      <div className="flex gap-x-4 gap-y-4">{remoteMediaEl}</div>
+      <div className="flex gap-x-4 gap-y-4">
+        <div>Remote media</div>
+        <div>{remoteMediaEl}</div>
+      </div>
     </div>
   );
 };

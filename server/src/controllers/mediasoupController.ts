@@ -46,7 +46,7 @@ const mediasoupStart = async () => {
     socket.on("create_webrtc_transport", async (_, callback) => {
       try {
         console.log("\ncreating webrtc transport");
-        const { params } = await room.createWebRtcTransport(socket.id);
+        const { params } = await room.CreateWebRtcTransport(socket.id);
         callback({ params });
       } catch (error) {
         console.error(error);

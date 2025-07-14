@@ -8,7 +8,7 @@ const config = {
 
   https: {
     listenIp: "0.0.0.0",
-    listenPort: 4443,
+    listenPort: 9000,
 
     tls: {
       cert: process.env.HTTPS_CERT || `${__dirname}/certs/server-cert.pem`,
@@ -24,10 +24,10 @@ const config = {
       dtlsPrivateKeyFile: process.env.WORKER_KEY,
 
       rtcMinPort: 10000,
-      rtcMaxPort: 59999,
+      rtcMaxPort: 10100,
 
-      loglevel: "warn" as WorkerLogLevel,
-      logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp"] as WorkerLogTag[],
+      loglevel: "debug" as WorkerLogLevel,
+      logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp", "bwe", "ortc", "sctp"] as WorkerLogTag[],
     },
 
     routerOptions: {
@@ -73,13 +73,13 @@ const config = {
       listenInfos: [
         {
           protocol: "udp",
-          ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
+          ip: process.env.MEDIASOUP_LISTEN_IP || "127.0.0.1",
           announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
           port: 44444,
         },
         {
           protocol: "tcp",
-          ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
+          ip: process.env.MEDIASOUP_LISTEN_IP || "127.0.0.1",
           announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
           port: 44444,
         },

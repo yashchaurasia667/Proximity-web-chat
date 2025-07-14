@@ -9,7 +9,7 @@
     "lint": "eslint --fix",
     "format": "prettier --write \"**/*.+(js|ts|json)\"",
     "generate-dev-certs": "mkdir certs && mkcert -install -cert-file certs/server-cert.pem -key-file certs/server-key.pem localhost 127.0.0.1 ::1",
-    "dev": "cross-env DEBUG=\"*mediasoup* *INFO* *WARN* *ERROR*\" INTERACTIVE=true tsx watch src/index.ts",
+    "dev": "cross-env DEBUG=\"*mediasoup*\" INTERACTIVE=true tsx watch src/index.ts",
     "build": "tsc && node dist/index.js"
   },
   "author": "Yash chaurasia",
