@@ -9,6 +9,7 @@ import initGame from "../../kaplay/initGame";
 import Chat from "./Chat";
 import ControlKeys from "./ControlKeys";
 import ControlBar from "./ControlBar";
+import Videochat from "./Videochat";
 
 // const game = gameSocket.of
 
@@ -54,7 +55,8 @@ const Game = () => {
         <div className="text-center mt-3">up, down, left, right</div>
       </div>
 
-      <ControlBar mic={false} camera={false} />
+      <Videochat />
+      <ControlBar mic={false} camera={false} screen={false} />
 
       <Chat socket={gameSocket} />
     </>
