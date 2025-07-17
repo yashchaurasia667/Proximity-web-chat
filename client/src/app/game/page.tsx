@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { gameSocket } from "../../utils";
@@ -15,12 +15,15 @@ import Videochat from "./Videochat";
 
 const Game = () => {
   const router = useRouter();
+  const [name, setName] = useState<string>("");
 
   useEffect(() => {
     const handleConnect = () => {
       const sprite = window.localStorage.getItem("sprite");
       const name = window.localStorage.getItem("name");
+
       if (sprite == null || name == null) router.push("/");
+      else setName(name);
 
       console.log("Connected with gameSocket ID:", gameSocket.id);
       initGame(name!, sprite!);
@@ -55,7 +58,7 @@ const Game = () => {
         <div className="text-center mt-3">up, down, left, right</div>
       </div>
 
-      <Videochat mic={false} camera={false} screen={false} />
+      <Videochat mic={false} camera={false} screen={false} name={name} />
       {/* <ControlBar mic={false} camera={false} screen={false} /> */}
 
       <Chat socket={gameSocket} />
