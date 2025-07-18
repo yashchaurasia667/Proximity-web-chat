@@ -94,19 +94,27 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
     setLocalVideoDevices(video);
   };
 
+  // INIT
   useEffect(() => {
     (async () => {
       await getLocalDevices();
     })();
   }, []);
 
-  const toggleSettings = () => {
-    setSettingState(!settingState);
-  };
+  // JOIN AND CREATE DEVICE
+  useEffect(() => {
+    (async () => {})();
+  }, []);
 
   return (
     <>
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-highlight px-2 py-2 rounded-full flex items-center gap-x-3 transition-all">
+      {/* CONTROL BAR */}
+      <div
+        className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-highlight px-2 py-2 rounded-full flex items-center gap-x-3 transition-all"
+        onClick={() => {
+          document.getElementsByTagName("canvas")[0].focus();
+        }}
+      >
         <div
           onClick={() => setMicState(!micState)}
           className="cursor-pointer hover:scale-110 transition-all hover:bg-elevated-highlight p-2 rounded-full"
@@ -144,7 +152,9 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
         <div
           className="cursor-pointer hover:scale-110 transition-all hover:bg-elevated-highlight p-2 rounded-full"
-          onClick={toggleSettings}
+          onClick={() => {
+            setSettingState(!settingState);
+          }}
         >
           <FaGear size={23} fill="#d9dbe1" className="hover:fill-white" />
         </div>
@@ -152,6 +162,9 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         <dialog
           className="bottom-full -right-full -translate-y-1 max-w-[400px] overflow-hidden rounded-md bg-highlight py-2 px-4 pb-4"
           open={settingState}
+          onFocusCapture={() => {
+            document.getElementsByTagName("canvas")[0].focus();
+          }}
         >
           {/* <div className="p-4"> */}
           <p className="font-semibold text-xl mb-4">Devices</p>

@@ -1,14 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Socket } from "socket.io-client";
 
 interface props {
@@ -38,17 +31,11 @@ const Chat = ({ socket }: props) => {
     setName(getName!);
 
     const handleJoin = (data: Message) => {
-      setMessages((prev) => [
-        ...prev,
-        { id: data.id, name: data.name, message: " has joined the chat!" },
-      ]);
+      setMessages((prev) => [...prev, { id: data.id, name: data.name, message: " has joined the chat!" }]);
     };
 
     const handleLeave = (data: Message) => {
-      setMessages((prev) => [
-        ...prev,
-        { id: data.id, name: data.name, message: " has disconnected..." },
-      ]);
+      setMessages((prev) => [...prev, { id: data.id, name: data.name, message: " has disconnected..." }]);
     };
 
     const handleMessage = (data: Message) => {
@@ -76,15 +63,14 @@ const Chat = ({ socket }: props) => {
           message: messageInput.trim(),
         });
         setMessageInput("");
+        // document.getElementsByTagName("canvas")[0].focus();
       }
     },
     [messageInput, name, socket]
   );
 
   const messageLog = useMemo(() => {
-    return messages.map((msg, index) => (
-      <div key={index}>{`${msg.name}: ${msg.message}`}</div>
-    ));
+    return messages.map((msg, index) => <div key={index}>{`${msg.name}: ${msg.message}`}</div>);
   }, [messages]);
 
   // useEffect(() => {
@@ -105,11 +91,7 @@ const Chat = ({ socket }: props) => {
         className={`bg-[#00000099] ml-1 rounded-md p-4 max-h-[200px] overflow-auto transition-all duration-300
       ${isHovering || isActive ? "" : "max-h-[60px]"}`}
       >
-        {isHovering || isActive ? (
-          messageLog
-        ) : (
-          <div className="truncate">{messageLog.slice(-1)}</div>
-        )}
+        {isHovering || isActive ? messageLog : <div className="truncate">{messageLog.slice(-1)}</div>}
       </div>
 
       <div className="flex items-center pl-4 gap-x-3 rounded-full bg-[#00000099] mt-3">
