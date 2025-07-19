@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
-import { BsFillCameraVideoFill, BsFillCameraVideoOffFill } from "react-icons/bs";
+import { BsCameraVideoOff, BsFillCameraVideoFill, BsFillCameraVideoOffFill } from "react-icons/bs";
 import { MdScreenShare, MdStopScreenShare } from "react-icons/md";
 import { FaGear } from "react-icons/fa6";
-import { getDevices } from "../sfu/helper";
+import { createMediasoupDevice, getDevices, socket, socketRequest } from "./helper";
+import { RtpCapabilities } from "mediasoup-client/types";
 
 interface props {
   mic: boolean;
@@ -19,6 +20,9 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   const [cameraState, setCameraState] = useState(camera);
   const [screenState, setScreenState] = useState(screen);
   const [settingState, setSettingState] = useState(false);
+
+  // MEDIASOUP RELATED
+  const [mediasoupDevice, setMediasoupDevice] = useState<Device | null>(null);
 
   // DEVICE REFS
   const videoSelectRef = useRef<HTMLSelectElement | null>(null);
@@ -103,8 +107,31 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
   // JOIN AND CREATE DEVICE
   useEffect(() => {
-    (async () => {})();
-  }, []);
+    (async () => {
+      if (!name) throw new Error("No name provided");
+      if (!mediasoupDevice) {
+        const json = await socketRequest("join", { name });
+        console.log("Joined Room: ", json);
+
+        const { rtpCapabilities, error } = (await socketRequest("get_router_rtp_capabilities")) as {
+          rtpCapabilities: RtpCapabilities;
+          error?: unknown;
+        };
+
+        if (error) {
+          console.error(error);
+          return;
+        }
+
+        const device = await createMediasoupDevice(rtpCapabilities);
+        if (!device) {
+          console.error("Failed to create device");
+          return;
+        }
+        setMediasoupDevice(device);
+      }
+    })();
+  }, [mediasoupDevice, name]);
 
   return (
     <>
@@ -192,8 +219,14 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
       </div>
 
       {/*  MEDIA ELEMENTS */}
-      <div className="absolute top-0 right-0">
-        {localMediaEl}
+      <div className="absolute top-0 right-0 mt-4 mr-2">
+        <div className="w-[280px] h-[180px] rounded-lg bg-[#242424]">
+          <span className="absolute bottom-0 left-0 p-3">
+            {micState ? <FaMicrophone size={20} fill="#d9dbe1" /> : <FaMicrophoneSlash size={25} fill="#ed2c3f" />}
+          </span>
+          {cameraState ? localMediaEl : <BsCameraVideoOff className="w-full h-full p-8" fill="#a0a2b3" />}
+        </div>
+
         {remoteMediaEl}
       </div>
     </>
