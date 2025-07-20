@@ -5,7 +5,7 @@ import { BsCameraVideoOff, BsFillCameraVideoFill, BsFillCameraVideoOffFill } fro
 import { MdScreenShare, MdStopScreenShare } from "react-icons/md";
 import { FaGear } from "react-icons/fa6";
 import { createMediasoupDevice, getConsumeStream, getDevices, initTransport, socket, socketRequest } from "./helper";
-import { Device, RtpCapabilities } from "mediasoup-client/types";
+import { Device, Producer, ProducerOptions, RtpCapabilities, Transport } from "mediasoup-client/types";
 
 interface props {
   mic: boolean;
@@ -25,6 +25,8 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   const [mediasoupDevice, setMediasoupDevice] = useState<Device | null>(null);
   const [producerTransport, setProducerTransport] = useState<Transport | null>(null);
   const [consumerTransport, setConsumerTransport] = useState<Transport | null>(null);
+  const [producerLabel, setProducerLabel] = useState<Map<string, string>>(new Map());
+  const [producers, setProducers] = useState<Map<string, Producer>>(new Map());
 
   // DEVICE REFS
   const videoSelectRef = useRef<HTMLSelectElement | null>(null);
@@ -98,6 +100,164 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
     setLocalAudioDevices(audio);
     setLocalVideoDevices(video);
+  };
+
+  const closeProducer = (type: string) => {
+    if (!producerLabel.has(type)) {
+      console.log("There is no producer of this type ", type);
+      return;
+    }
+
+    const producerId = producerLabel.get(type);
+    console.log("close producer", producerId);
+
+    socket.emit("producer_closed", { producerId });
+    producers.get(producerId!)?.close();
+
+    setProducers((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(producerId!);
+      return newMap;
+    });
+
+    if (type !== "audioType") {
+      setLocalMedia((prev) => {
+        return prev.filter((media) => media.type !== type);
+      });
+    }
+
+    setProducerLabel((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(type);
+      return newMap;
+    });
+  };
+
+  const produce = async (type: string, deviceId: string = "") => {
+    let mediaConstraints = {};
+    let audio = false;
+    let screen = false;
+
+    switch (type) {
+      case "audioType":
+        mediaConstraints = {
+          audio: {
+            deviceId,
+          },
+          video: false,
+        };
+        audio = true;
+        break;
+
+      case "videoType":
+        mediaConstraints = {
+          audio: false,
+          video: {
+            width: {
+              min: 640,
+              ideal: 1920,
+            },
+            height: {
+              min: 480,
+              ideal: 1080,
+            },
+            deviceId,
+          },
+        };
+        break;
+
+      case "screenType":
+        mediaConstraints = false;
+        screen = true;
+        break;
+
+      default:
+        break;
+    }
+
+    if (!mediasoupDevice?.canProduce("video") && !audio) {
+      console.error("Cannot produce video");
+      return;
+    }
+    if (producerLabel.has(type)) {
+      console.log("Producer already exists for this type", type);
+      return;
+    }
+    if (!producerTransport) {
+      console.error("No producer transport");
+      return;
+    }
+
+    try {
+      const stream = screen
+        ? await navigator.mediaDevices.getDisplayMedia()
+        : await navigator.mediaDevices.getUserMedia(mediaConstraints);
+
+      const track = audio ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
+      if (!track) throw new Error("No media track available");
+      const params: ProducerOptions = { track };
+
+      if (!audio && !screen) {
+        params.encodings = [
+          {
+            rid: "r0",
+            maxBitrate: 100000,
+            //scaleResolutionDownBy: 10.0,
+            scalabilityMode: "S1T3",
+          },
+          {
+            rid: "r1",
+            maxBitrate: 300000,
+            scalabilityMode: "S1T3",
+          },
+          {
+            rid: "r2",
+            maxBitrate: 900000,
+            scalabilityMode: "S1T3",
+          },
+        ];
+
+        params.codecOptions = {
+          videoGoogleStartBitrate: 1000,
+        };
+      }
+
+      const producer = await producerTransport.produce(params);
+      if (!producer) {
+        console.log("No Producer");
+        return;
+      }
+
+      setProducers((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(producer.id, producer);
+        return newMap;
+      });
+
+      if (!audio) {
+        setLocalMedia((prev) => [...prev, { type, stream }]);
+      }
+
+      producer.on("trackended", () => {
+        closeProducer(type);
+      });
+
+      producer.on("@close", () => {
+        console.log("Closing Producer");
+
+        for (const track of stream.getTracks()) {
+          track.stop();
+        }
+
+        setProducers((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(producer.id);
+          return newMap;
+        });
+      });
+    } catch (error) {
+      console.error("Produce Error: ", error);
+    }
   };
 
   const removeConsumer = (consumerId: string) => {
@@ -225,7 +385,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   // INIT SOCKETS
   useEffect(() => {
     if (!consumerTransport) {
-      console.error("No consumer transport");
+      console.log("No consumer transport");
       return;
     }
 
@@ -250,6 +410,25 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
     };
   }, [clean, consume, consumerTransport, exit]);
 
+  // HANDLE FUNCTIONS
+  const handleMicrophone = () => {
+    if (micState) closeProducer("audioType");
+    else produce("audioType", audioSelectRef.current?.value);
+    setMicState(!micState);
+  };
+
+  const handleCamera = () => {
+    if (cameraState) closeProducer("videoType");
+    else produce("videoType", videoSelectRef.current?.value);
+    setCameraState(!cameraState);
+  };
+
+  const handleScreen = () => {
+    if (screenState) closeProducer("screenType");
+    else produce("screenType");
+    setScreenState(!screenState);
+  };
+
   return (
     <>
       {/* CONTROL BAR */}
@@ -260,7 +439,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         }}
       >
         <div
-          onClick={() => setMicState(!micState)}
+          onClick={handleMicrophone}
           className="cursor-pointer hover:scale-110 transition-all hover:bg-elevated-highlight p-2 rounded-full"
         >
           {micState ? (
@@ -271,7 +450,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         </div>
 
         <div
-          onClick={() => setCameraState(!cameraState)}
+          onClick={handleCamera}
           className="cursor-pointer hover:scale-110 transition-all hover:bg-elevated-highlight p-2 rounded-full"
         >
           {cameraState ? (
@@ -282,7 +461,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         </div>
 
         <div
-          onClick={() => setScreenState(!screenState)}
+          onClick={handleScreen}
           className="cursor-pointer hover:scale-110 transition-all hover:bg-elevated-highlight p-2 rounded-full"
         >
           {screenState ? (
@@ -337,8 +516,8 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
       {/*  MEDIA ELEMENTS */}
       <div className="absolute top-0 right-0 mt-4 mr-2">
-        <div className="w-[280px] h-[180px] rounded-lg bg-[#242424]">
-          <span className="absolute bottom-0 left-0 p-3">
+        <div className="w-[280px] h-[180px] rounded-lg bg-[#242424] overflow-hidden">
+          <span className="absolute bottom-0 left-0 p-3 z-[999]">
             {micState ? <FaMicrophone size={20} fill="#d9dbe1" /> : <FaMicrophoneSlash size={25} fill="#ed2c3f" />}
           </span>
           {cameraState ? localMediaEl : <BsCameraVideoOff className="w-full h-full p-8" fill="#a0a2b3" />}
