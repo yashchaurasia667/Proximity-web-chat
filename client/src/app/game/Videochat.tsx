@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
 import { BsCameraVideoOff, BsFillCameraVideoFill, BsFillCameraVideoOffFill } from "react-icons/bs";
 import { MdScreenShare, MdStopScreenShare } from "react-icons/md";
 import { FaGear } from "react-icons/fa6";
-import { createMediasoupDevice, getDevices, socket, socketRequest } from "./helper";
-import { RtpCapabilities } from "mediasoup-client/types";
+import { createMediasoupDevice, getConsumeStream, getDevices, initTransport, socket, socketRequest } from "./helper";
+import { Device, RtpCapabilities } from "mediasoup-client/types";
 
 interface props {
   mic: boolean;
@@ -23,6 +23,8 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
   // MEDIASOUP RELATED
   const [mediasoupDevice, setMediasoupDevice] = useState<Device | null>(null);
+  const [producerTransport, setProducerTransport] = useState<Transport | null>(null);
+  const [consumerTransport, setConsumerTransport] = useState<Transport | null>(null);
 
   // DEVICE REFS
   const videoSelectRef = useRef<HTMLSelectElement | null>(null);
@@ -98,6 +100,75 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
     setLocalVideoDevices(video);
   };
 
+  const removeConsumer = (consumerId: string) => {
+    console.log("removing a consumer:", consumerId);
+    setRemoteStreams((prev) => {
+      return prev.filter((media) => {
+        if (media.id === consumerId) {
+          media.stream.getTracks().forEach((track) => track.stop());
+          return false;
+        }
+        return true;
+      });
+    });
+  };
+
+  const consume = useCallback(
+    async (producerId: string) => {
+      if (!consumerTransport || !mediasoupDevice) {
+        console.log("No consumer transport or mediasoup device");
+        console.log("[DEBUG] consumer Transport:", consumerTransport);
+        console.log("[DEBUG] media device:", mediasoupDevice);
+        console.log("[DEBUG] consumer transport connection state:", consumerTransport.connectionState);
+        console.log("");
+        return;
+      }
+
+      const res = await getConsumeStream(producerId, mediasoupDevice, consumerTransport);
+      if (!res) {
+        console.warn("Failed to consume media");
+        return;
+      }
+
+      const stream = new MediaStream();
+      stream.addTrack(res.consumer.track);
+      setRemoteStreams((prev) => [...prev, { id: res.consumer.id, stream }]);
+
+      res.consumer.on("trackended", () => {
+        console.log("track ended");
+        removeConsumer(res.consumer.id);
+      });
+
+      res.consumer.on("transportclose", () => {
+        console.log("consumer transport closed");
+        removeConsumer(res.consumer.id);
+      });
+    },
+    [consumerTransport, mediasoupDevice]
+  );
+
+  const clean = useCallback(() => {
+    consumerTransport.close();
+    producerTransport.close();
+    socket.removeAllListeners("disconnect");
+    socket.removeAllListeners("new_producers");
+    socket.removeAllListeners("consumer_closed");
+  }, [consumerTransport, producerTransport]);
+
+  const exit = useCallback(
+    (offline = false) => {
+      if (!offline) {
+        socketRequest("exit_room")
+          .then((e) => console.log(e))
+          .catch((e) => console.warn(e))
+          .finally(() => clean());
+      } else {
+        clean();
+      }
+    },
+    [clean]
+  );
+
   // INIT
   useEffect(() => {
     (async () => {
@@ -132,6 +203,52 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
       }
     })();
   }, [mediasoupDevice, name]);
+
+  // INIT TRANSPORTS
+  useEffect(() => {
+    (async () => {
+      if (mediasoupDevice && !producerTransport && !consumerTransport) {
+        const res = await initTransport(mediasoupDevice);
+        if (!res) {
+          console.error("Failed to initialize transports");
+          return;
+        }
+
+        setProducerTransport(res.pTransport);
+        setConsumerTransport(res.cTransport);
+
+        socket.emit("get_producers");
+      }
+    })();
+  }, [consumerTransport, mediasoupDevice, producerTransport]);
+
+  // INIT SOCKETS
+  useEffect(() => {
+    if (!consumerTransport) {
+      console.error("No consumer transport");
+      return;
+    }
+
+    socket.on("consumer_closed", ({ consumerId }: { consumerId: string }) => {
+      console.log("closing consumer:", consumerId);
+      // TODO: remove consumer
+    });
+
+    socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
+      console.log("New producers:", data);
+      for (const { producerId } of data) {
+        await consume(producerId);
+      }
+    });
+
+    socket.on("disconnect", () => {
+      exit(true);
+    });
+
+    return () => {
+      clean();
+    };
+  }, [clean, consume, consumerTransport, exit]);
 
   return (
     <>
