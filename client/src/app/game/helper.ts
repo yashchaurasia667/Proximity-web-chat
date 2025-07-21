@@ -47,14 +47,34 @@ export const socketRequest = (type: string, data = {}) => {
 };
 
 export const getDevices = async () => {
-  const constraints = { video: true, audio: true };
-  const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  for (const track of stream.getTracks()) {
-    track.stop();
+  // 1. Check if navigator.mediaDevices exists
+  if (!navigator.mediaDevices) {
+    console.error("navigator.mediaDevices is not available");
+    return [];
   }
-  return devices;
+
+  const constraints = { video: true, audio: true };
+  let stream = null;
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const devices = await navigator.mediaDevices.enumerateDevices();
+
+    for (const track of stream.getTracks()) {
+      track.stop();
+    }
+
+    return devices;
+  } catch (error) {
+    console.error("Error accessing media devices:", error);
+    return [];
+  } finally {
+    if (stream) {
+      for (const track of stream.getTracks()) {
+        track.stop();
+      }
+    }
+  }
 };
 
 export const createMediasoupDevice = async (routerRtpCapabilities: RtpCapabilities) => {

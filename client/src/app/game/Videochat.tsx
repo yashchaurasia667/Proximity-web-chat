@@ -48,7 +48,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         autoPlay
         playsInline
         muted
-        className={type === "videoType" ? "rotate-y-180" : ""}
+        className={type === "videoType" ? "rotate-y-180 " : ""}
         ref={(video) => {
           if (video) video.srcObject = stream;
         }}
@@ -62,7 +62,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         key={id}
         autoPlay
         playsInline
-        className="rotate-y-180"
+        className="rotate-y-180 w-72 h-40"
         ref={(video) => {
           if (video) video.srcObject = stream;
         }}
@@ -134,6 +134,8 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   };
 
   const produce = async (type: string, deviceId: string = "") => {
+    if (localAudioDevices.length === 0 || localVideoDevices.length === 0) await getLocalDevices();
+
     let mediaConstraints = {};
     let audio = false;
     let screen = false;
@@ -279,7 +281,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         console.log("No consumer transport or mediasoup device");
         console.log("[DEBUG] consumer Transport:", consumerTransport);
         console.log("[DEBUG] media device:", mediasoupDevice);
-        console.log("[DEBUG] consumer transport connection state:", consumerTransport.connectionState);
+        console.log("[DEBUG] consumer transport connection state:", consumerTransport?.connectionState);
         console.log("");
         return;
       }
@@ -308,8 +310,8 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   );
 
   const clean = useCallback(() => {
-    consumerTransport.close();
-    producerTransport.close();
+    consumerTransport?.close();
+    producerTransport?.close();
     socket.removeAllListeners("disconnect");
     socket.removeAllListeners("new_producers");
     socket.removeAllListeners("consumer_closed");
@@ -331,9 +333,10 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
   // INIT
   useEffect(() => {
-    (async () => {
-      await getLocalDevices();
-    })();
+  //   (async () => {
+  //     if (navigator.mediaDevices) await getLocalDevices();
+    // })();
+    // document.getElementsByTagName("canvas")[0].onload()
   }, []);
 
   // JOIN AND CREATE DEVICE
@@ -516,7 +519,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
       {/*  MEDIA ELEMENTS */}
       <div className="absolute top-0 right-0 mt-4 mr-2">
-        <div className="w-[280px] h-[180px] rounded-lg bg-[#242424] overflow-hidden">
+        <div className="w-72 h-40 rounded-lg bg-[#242424] overflow-hidden">
           <span className="absolute bottom-0 left-0 p-3 z-[999]">
             {micState ? <FaMicrophone size={20} fill="#d9dbe1" /> : <FaMicrophoneSlash size={25} fill="#ed2c3f" />}
           </span>
