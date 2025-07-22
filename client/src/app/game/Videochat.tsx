@@ -42,27 +42,31 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
   // VIDEO ELEMENT MEMOS
   const localMediaEl = useMemo(() => {
-    return localMedia.map(({ stream, type }) => (
-      <video
-        key={stream.id}
-        autoPlay
-        playsInline
-        muted
-        className={type === "videoType" ? "rotate-y-180 " : ""}
-        ref={(video) => {
-          if (video) video.srcObject = stream;
-        }}
-      />
-    ));
+    return localMedia.map(({ stream, type }) =>
+      type !== "audioType" ? (
+        <video
+          key={stream.id}
+          autoPlay
+          playsInline
+          muted
+          className={type === "videoType" ? "rotate-y-180 " : ""}
+          ref={(video) => {
+            if (video) video.srcObject = stream;
+          }}
+        />
+      ) : (
+        ""
+      )
+    );
   }, [localMedia]);
 
   const remoteMediaEl = useMemo(() => {
-    return remoteStreams.map(({ id, stream }) => (
+    return remoteStreams.map(({ stream }, index) => (
       <video
-        key={id}
+        key={index}
         autoPlay
         playsInline
-        className="rotate-y-180 w-72 h-40"
+        className="rotate-y-180 w-72 h-40 bg-black"
         ref={(video) => {
           if (video) video.srcObject = stream;
         }}
@@ -257,6 +261,12 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
           return newMap;
         });
       });
+
+      setProducerLabel((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(type, producer.id);
+        return newMap;
+      });
     } catch (error) {
       console.error("Produce Error: ", error);
     }
@@ -332,12 +342,12 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   );
 
   // INIT
-  useEffect(() => {
+  // useEffect(() => {
   //   (async () => {
   //     if (navigator.mediaDevices) await getLocalDevices();
-    // })();
-    // document.getElementsByTagName("canvas")[0].onload()
-  }, []);
+  // })();
+  // document.getElementsByTagName("canvas")[0].onload()
+  // }, []);
 
   // JOIN AND CREATE DEVICE
   useEffect(() => {
@@ -519,14 +529,15 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
       {/*  MEDIA ELEMENTS */}
       <div className="absolute top-0 right-0 mt-4 mr-2">
-        <div className="w-72 h-40 rounded-lg bg-[#242424] overflow-hidden">
+        <div className="w-72 h-40 rounded-lg bg-[#242424] overflow-hidden relative">
           <span className="absolute bottom-0 left-0 p-3 z-[999]">
             {micState ? <FaMicrophone size={20} fill="#d9dbe1" /> : <FaMicrophoneSlash size={25} fill="#ed2c3f" />}
           </span>
           {cameraState ? localMediaEl : <BsCameraVideoOff className="w-full h-full p-8" fill="#a0a2b3" />}
         </div>
 
-        {remoteMediaEl}
+        {/* <div className="mt-4"> */}
+        <div className="mt-2">{remoteMediaEl}</div>
       </div>
     </>
   );
