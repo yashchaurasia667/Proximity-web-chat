@@ -404,8 +404,6 @@ const SFU = () => {
   useEffect(() => {
     (async () => {
       if (mediasoupDevice && !consumerTransport) {
-        // console.log("Creating transports");
-        // console.log(mediasoupDevice);
         const res = await initTransport(mediasoupDevice);
         if (!res) {
           console.error("Failed to initialize transports");

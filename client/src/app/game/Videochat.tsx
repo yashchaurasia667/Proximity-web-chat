@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
@@ -20,6 +22,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   const [cameraState, setCameraState] = useState(camera);
   const [screenState, setScreenState] = useState(screen);
   const [settingState, setSettingState] = useState(false);
+  // const [gotLocalMedia, setGotLocalMedia] = useState(false);
 
   // MEDIASOUP RELATED
   const [mediasoupDevice, setMediasoupDevice] = useState<Device | null>(null);
@@ -93,17 +96,36 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
   // FUNCTIONS
   const getLocalDevices = async () => {
-    const devices = await getDevices();
+    try {
+      console.log("Requesting permissions and fetching devices...");
+      const [devices] = await Promise.all([getDevices()]);
 
-    const audio = [];
-    const video = [];
-    for (const device of devices) {
-      if (device.kind === "audioinput") audio.push(device);
-      else if (device.kind === "videoinput") video.push(device);
+      const audio = [];
+      const video = [];
+      for (const device of devices) {
+        if (device.kind === "audioinput") audio.push(device);
+        else if (device.kind === "videoinput") video.push(device);
+      }
+
+      setLocalAudioDevices(audio);
+      setLocalVideoDevices(video);
+    } catch (error) {
+      console.error("Failed during permission or setting device", error);
+      setLocalAudioDevices([]);
+      setLocalVideoDevices([]);
     }
 
-    setLocalAudioDevices(audio);
-    setLocalVideoDevices(video);
+    // const devices = await getDevices();
+
+    // const audio = [];
+    // const video = [];
+    // for (const device of devices) {
+    //   if (device.kind === "audioinput") audio.push(device);
+    //   else if (device.kind === "videoinput") video.push(device);
+    // }
+
+    // setLocalAudioDevices(audio);
+    // setLocalVideoDevices(video);
   };
 
   const closeProducer = (type: string) => {
@@ -138,7 +160,9 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   };
 
   const produce = async (type: string, deviceId: string = "") => {
-    if (localAudioDevices.length === 0 || localVideoDevices.length === 0) await getLocalDevices();
+    if (localAudioDevices.length === 0 || localVideoDevices.length === 0) {
+      await getLocalDevices();
+    }
 
     let mediaConstraints = {};
     let audio = false;
@@ -342,45 +366,45 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   );
 
   // INIT
-  // useEffect(() => {
-  //   (async () => {
-  //     if (navigator.mediaDevices) await getLocalDevices();
-  // })();
-  // document.getElementsByTagName("canvas")[0].onload()
-  // }, []);
+  useEffect(() => {
+    (async () => {
+      await getLocalDevices();
+    })();
+  }, []);
 
   // JOIN AND CREATE DEVICE
   useEffect(() => {
     (async () => {
       if (!name) throw new Error("No name provided");
-      if (!mediasoupDevice) {
-        const json = await socketRequest("join", { name });
-        console.log("Joined Room: ", json);
+      // if (!gotLocalMedia) return;
+      if (mediasoupDevice) return;
 
-        const { rtpCapabilities, error } = (await socketRequest("get_router_rtp_capabilities")) as {
-          rtpCapabilities: RtpCapabilities;
-          error?: unknown;
-        };
+      const json = await socketRequest("join", { name });
+      console.log("Joined Room: ", json);
 
-        if (error) {
-          console.error(error);
-          return;
-        }
+      const { rtpCapabilities, error } = (await socketRequest("get_router_rtp_capabilities")) as {
+        rtpCapabilities: RtpCapabilities;
+        error?: unknown;
+      };
 
-        const device = await createMediasoupDevice(rtpCapabilities);
-        if (!device) {
-          console.error("Failed to create device");
-          return;
-        }
-        setMediasoupDevice(device);
+      if (error) {
+        console.error(error);
+        return;
       }
+
+      const device = await createMediasoupDevice(rtpCapabilities);
+      if (!device) {
+        console.error("Failed to create device");
+        return;
+      }
+      setMediasoupDevice(device);
     })();
   }, [mediasoupDevice, name]);
 
   // INIT TRANSPORTS
   useEffect(() => {
     (async () => {
-      if (mediasoupDevice && !producerTransport && !consumerTransport) {
+      if (mediasoupDevice && !consumerTransport) {
         const res = await initTransport(mediasoupDevice);
         if (!res) {
           console.error("Failed to initialize transports");
@@ -404,7 +428,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
     socket.on("consumer_closed", ({ consumerId }: { consumerId: string }) => {
       console.log("closing consumer:", consumerId);
-      // TODO: remove consumer
+      removeConsumer(consumerId);
     });
 
     socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
