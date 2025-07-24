@@ -174,37 +174,41 @@ export const initTransport = async (device: mediasoupClient.Device) => {
 };
 
 export const getConsumeStream = async (producerId: string, mediasoupDevice: Device, consumerTransport: Transport) => {
-  const { rtpCapabilities } = mediasoupDevice;
-  const data = (await socketRequest("consume", {
-    consumerTransportId: consumerTransport.id,
-    rtpCapabilities,
-    producerId,
-  })) as consumeParams;
+  return new Promise(async (resolve, reject) => {
+    const { rtpCapabilities } = mediasoupDevice;
+    const data = (await socketRequest("consume", {
+      consumerTransportId: consumerTransport.id,
+      rtpCapabilities,
+      producerId,
+    })) as consumeParams;
 
-  if (!data) {
-    console.log("Failed to consume");
-    return;
-  }
+    if (!data) {
+      console.log("Failed to consume");
+      reject();
+    }
+    const { id, kind, rtpParameters } = data;
+    // console.log(consumerTransport.connectionState);
 
-  const { id, kind, rtpParameters } = data;
-  // console.log(consumerTransport.connectionState);
+    const handleConnection = async (state: string) => {
+      if (state === "connected") {
+        console.log("Transport connected, now consuming.");
+        const consumer = await consumerTransport.consume({
+          id,
+          producerId,
+          kind,
+          rtpParameters,
+        });
 
-  const consumer = await consumerTransport.consume({
-    id,
-    producerId,
-    kind,
-    rtpParameters,
+        consumerTransport.removeListener("connectionstatechange", handleConnection);
+
+        resolve({ consumer, kind: data.kind });
+      } else if (state === "failed") {
+        consumerTransport.removeListener("connectionstatechange", handleConnection);
+
+        reject(new Error("Transport connection failed."));
+      }
+    };
+
+    consumerTransport.on("connectionstatechange", handleConnection);
   });
-  // console.log("get consume stream");
-
-  console.log("consumer transport state: ", consumerTransport.connectionState);
-  console.log("consume tracks", consumer.track);
-
-  // const stream = new MediaStream();
-  // stream.addTrack(consumer.track);
-
-  return {
-    consumer,
-    kind: data.kind,
-  };
 };

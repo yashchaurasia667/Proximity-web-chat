@@ -22,7 +22,6 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   const [cameraState, setCameraState] = useState(camera);
   const [screenState, setScreenState] = useState(screen);
   const [settingState, setSettingState] = useState(false);
-  // const [gotLocalMedia, setGotLocalMedia] = useState(false);
 
   // MEDIASOUP RELATED
   const [mediasoupDevice, setMediasoupDevice] = useState<Device | null>(null);
@@ -30,6 +29,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   const [consumerTransport, setConsumerTransport] = useState<Transport | null>(null);
   const [producerLabel, setProducerLabel] = useState<Map<string, string>>(new Map());
   const [producers, setProducers] = useState<Map<string, Producer>>(new Map());
+  const [pendingConsumerIds, setPendingConsumerIds] = useState<string[]>([]);
 
   // DEVICE REFS
   const videoSelectRef = useRef<HTMLSelectElement | null>(null);
@@ -320,25 +320,29 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         return;
       }
 
+      console.log("consuming");
       const res = await getConsumeStream(producerId, mediasoupDevice, consumerTransport);
-      if (!res) {
-        console.warn("Failed to consume media");
-        return;
-      }
+      console.log(res);
 
-      const stream = new MediaStream();
-      stream.addTrack(res.consumer.track);
-      setRemoteStreams((prev) => [...prev, { id: res.consumer.id, stream }]);
+      // const res = await getConsumeStream(producerId, mediasoupDevice, consumerTransport);
+      // if (!res) {
+      //   console.warn("Failed to consume media");
+      //   return;
+      // }
 
-      res.consumer.on("trackended", () => {
-        console.log("track ended");
-        removeConsumer(res.consumer.id);
-      });
+      // const stream = new MediaStream();
+      // stream.addTrack(res.consumer.track);
+      // setRemoteStreams((prev) => [...prev, { id: res.consumer.id, stream }]);
 
-      res.consumer.on("transportclose", () => {
-        console.log("consumer transport closed");
-        removeConsumer(res.consumer.id);
-      });
+      // res.consumer.on("trackended", () => {
+      //   console.log("track ended");
+      //   removeConsumer(res.consumer.id);
+      // });
+
+      // res.consumer.on("transportclose", () => {
+      //   console.log("consumer transport closed");
+      //   removeConsumer(res.consumer.id);
+      // });
     },
     [consumerTransport, mediasoupDevice]
   );
@@ -433,9 +437,8 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
     socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
       console.log("New producers:", data);
-      for (const { producerId } of data) {
-        await consume(producerId);
-      }
+      const producerIds = data.map((p) => p.producerId);
+      setPendingConsumerIds((prev) => [...prev, ...producerIds]);
     });
 
     socket.on("disconnect", () => {
@@ -446,6 +449,14 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
       clean();
     };
   }, [clean, consume, consumerTransport, exit]);
+
+  // RESOLVE PENDING CONSUMERS
+  useEffect(() => {
+    if (pendingConsumerIds.length === 0) return;
+
+    for (const id of pendingConsumerIds) consume(id);
+    setPendingConsumerIds([]);
+  }, [consume, consumerTransport?.connectionState, pendingConsumerIds, pendingConsumerIds.length]);
 
   // HANDLE FUNCTIONS
   const handleMicrophone = () => {
