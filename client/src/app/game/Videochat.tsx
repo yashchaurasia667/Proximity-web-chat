@@ -71,7 +71,16 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         playsInline
         className="rotate-y-180 w-72 h-40 bg-black"
         ref={(video) => {
-          if (video) video.srcObject = stream;
+          if (video) {
+            console.log(stream);
+            video.srcObject = stream;
+            // video
+            // .play()
+            // .then(() => (video.muted = false))
+            // .catch((err) => console.error("Play error", err));
+          } else {
+            console.log("[DEBUG] NO VIDEO STREAM RECEIVED");
+          }
         }}
       />
     ));
@@ -322,27 +331,24 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
       console.log("consuming");
       const res = await getConsumeStream(producerId, mediasoupDevice, consumerTransport);
-      console.log(res);
+      if (!res) {
+        console.warn("Failed to consume media");
+        return;
+      }
 
-      // const res = await getConsumeStream(producerId, mediasoupDevice, consumerTransport);
-      // if (!res) {
-      //   console.warn("Failed to consume media");
-      //   return;
-      // }
+      const stream = new MediaStream();
+      stream.addTrack(res.consumer.track);
+      setRemoteStreams((prev) => [...prev, { id: res.consumer.id, stream }]);
 
-      // const stream = new MediaStream();
-      // stream.addTrack(res.consumer.track);
-      // setRemoteStreams((prev) => [...prev, { id: res.consumer.id, stream }]);
+      res.consumer.on("trackended", () => {
+        console.log("track ended");
+        removeConsumer(res.consumer.id);
+      });
 
-      // res.consumer.on("trackended", () => {
-      //   console.log("track ended");
-      //   removeConsumer(res.consumer.id);
-      // });
-
-      // res.consumer.on("transportclose", () => {
-      //   console.log("consumer transport closed");
-      //   removeConsumer(res.consumer.id);
-      // });
+      res.consumer.on("transportclose", () => {
+        console.log("consumer transport closed");
+        removeConsumer(res.consumer.id);
+      });
     },
     [consumerTransport, mediasoupDevice]
   );
