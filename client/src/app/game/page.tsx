@@ -36,7 +36,7 @@ const Game = () => {
 
   return (
     <>
-      <div className="font-pixelated absolute text-lg right-0 bottom-0 py-8">
+      <div className="font-pixelated absolute text-lg right-0 bottom-0 py-8 w-[20%]">
         <p className="text-2xl px-28">CONTROLS</p>
         <div className="flex gap-x-3 justify-center mt-8">
           <ControlKeys
@@ -55,7 +55,7 @@ const Game = () => {
         <div className="text-center mt-3">up, down, left, right</div>
       </div>
 
-      {name ? <Videochat mic={false} camera={false} screen={false} name={name} /> : ""}
+      {name ? <Videochat name={name} /> : ""}
       {/* <ControlBar mic={false} camera={false} screen={false} /> */}
 
       <Chat socket={gameSocket} />

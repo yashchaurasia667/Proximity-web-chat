@@ -1,22 +1,22 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
-import { BsCameraVideoOff, BsFillCameraVideoFill, BsFillCameraVideoOffFill } from "react-icons/bs";
-import { MdScreenShare, MdStopScreenShare } from "react-icons/md";
-import { FaGear } from "react-icons/fa6";
-import { createMediasoupDevice, getConsumeStream, getDevices, initTransport, socket, socketRequest } from "./helper";
 import { Device, Producer, ProducerOptions, RtpCapabilities, Transport } from "mediasoup-client/types";
+import { createMediasoupDevice, getConsumeStream, getDevices, initTransport, socket, socketRequest } from "./helper";
+
+import { FaGear } from "react-icons/fa6";
+import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
+import { MdScreenShare, MdStopScreenShare } from "react-icons/md";
+import { BsCameraVideoOff, BsFillCameraVideoFill, BsFillCameraVideoOffFill } from "react-icons/bs";
 
 interface props {
-  mic: boolean;
-  camera: boolean;
-  screen: boolean;
+  mic?: boolean;
+  camera?: boolean;
+  screen?: boolean;
   name: string;
 }
 
-const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: props) => {
+const Videochat = ({ mic = true, camera = false, screen = false, name = "" }: props) => {
   // COMPONENT STATES
   const [micState, setMicState] = useState(mic);
   const [cameraState, setCameraState] = useState(camera);
@@ -451,6 +451,15 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
       };
     }
   }, [clean, consume, consumerTransport, exit]);
+
+  // PRODUCE ONCE
+  useEffect(() => {
+    let initProduceAttempt = false;
+    if (producerTransport && !initProduceAttempt) {
+      produce("audioType", videoSelectRef.current?.value);
+      initProduceAttempt = true;
+    }
+  }, [producerTransport, produce, closeProducer, videoSelectRef]);
 
   // HANDLE FUNCTIONS
   const handleMicrophone = () => {
