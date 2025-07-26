@@ -29,7 +29,6 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   const [consumerTransport, setConsumerTransport] = useState<Transport | null>(null);
   const [producerLabel, setProducerLabel] = useState<Map<string, string>>(new Map());
   const [producers, setProducers] = useState<Map<string, Producer>>(new Map());
-  const [pendingConsumerIds, setPendingConsumerIds] = useState<string[]>([]);
 
   // DEVICE REFS
   const videoSelectRef = useRef<HTMLSelectElement | null>(null);
@@ -41,7 +40,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
   // VIDEO ELEMENT STATES
   const [localMedia, setLocalMedia] = useState<{ type: string; stream: MediaStream }[]>([]);
-  const [remoteStreams, setRemoteStreams] = useState<{ id: string; stream: MediaStream }[]>([]);
+  const [remoteStreams, setRemoteStreams] = useState<{ id: string; type: string; stream: MediaStream }[]>([]);
 
   // VIDEO ELEMENT MEMOS
   const localMediaEl = useMemo(() => {
@@ -64,26 +63,34 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   }, [localMedia]);
 
   const remoteMediaEl = useMemo(() => {
-    return remoteStreams.map(({ stream }, index) => (
-      <video
-        key={index}
-        autoPlay
-        playsInline
-        className="rotate-y-180 w-72 h-40 bg-black"
-        ref={(video) => {
-          if (video) {
-            console.log(stream);
-            video.srcObject = stream;
-            // video
-            // .play()
-            // .then(() => (video.muted = false))
-            // .catch((err) => console.error("Play error", err));
-          } else {
-            console.log("[DEBUG] NO VIDEO STREAM RECEIVED");
-          }
-        }}
-      />
-    ));
+    return remoteStreams.map(({ stream, type }, index) =>
+      type === "audio" ? (
+        <audio
+          key={index}
+          autoPlay
+          hidden
+          ref={(audio) => {
+            if (audio) audio.srcObject = stream;
+            else console.log("[DEBUG] NO AUDIO STREAM RECEIVED");
+          }}
+        />
+      ) : (
+        <video
+          key={index}
+          autoPlay
+          playsInline
+          className="rotate-y-180 w-72 h-40 bg-black rounded-md"
+          ref={(video) => {
+            if (video) {
+              console.log(stream);
+              video.srcObject = stream;
+            } else {
+              console.log("[DEBUG] NO VIDEO STREAM RECEIVED");
+            }
+          }}
+        />
+      )
+    );
   }, [remoteStreams]);
 
   // DEVICE SELECT OPTIONS
@@ -105,208 +112,191 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
 
   // FUNCTIONS
   const getLocalDevices = async () => {
-    try {
-      console.log("Requesting permissions and fetching devices...");
-      const [devices] = await Promise.all([getDevices()]);
+    const devices = await getDevices();
 
-      const audio = [];
-      const video = [];
-      for (const device of devices) {
-        if (device.kind === "audioinput") audio.push(device);
-        else if (device.kind === "videoinput") video.push(device);
-      }
-
-      setLocalAudioDevices(audio);
-      setLocalVideoDevices(video);
-    } catch (error) {
-      console.error("Failed during permission or setting device", error);
-      setLocalAudioDevices([]);
-      setLocalVideoDevices([]);
+    const audio = [];
+    const video = [];
+    for (const device of devices) {
+      if (device.kind === "audioinput") audio.push(device);
+      else if (device.kind === "videoinput") video.push(device);
     }
-
-    // const devices = await getDevices();
-
-    // const audio = [];
-    // const video = [];
-    // for (const device of devices) {
-    //   if (device.kind === "audioinput") audio.push(device);
-    //   else if (device.kind === "videoinput") video.push(device);
-    // }
-
-    // setLocalAudioDevices(audio);
-    // setLocalVideoDevices(video);
+    setLocalAudioDevices(audio);
+    setLocalVideoDevices(video);
   };
 
-  const closeProducer = (type: string) => {
-    if (!producerLabel.has(type)) {
-      console.log("There is no producer of this type ", type);
-      return;
-    }
-
-    const producerId = producerLabel.get(type);
-    console.log("close producer", producerId);
-
-    socket.emit("producer_closed", { producerId });
-    producers.get(producerId!)?.close();
-
-    setProducers((prev) => {
-      const newMap = new Map(prev);
-      newMap.delete(producerId!);
-      return newMap;
-    });
-
-    if (type !== "audioType") {
-      setLocalMedia((prev) => {
-        return prev.filter((media) => media.type !== type);
-      });
-    }
-
-    setProducerLabel((prev) => {
-      const newMap = new Map(prev);
-      newMap.delete(type);
-      return newMap;
-    });
-  };
-
-  const produce = async (type: string, deviceId: string = "") => {
-    if (localAudioDevices.length === 0 || localVideoDevices.length === 0) {
-      await getLocalDevices();
-    }
-
-    let mediaConstraints = {};
-    let audio = false;
-    let screen = false;
-
-    switch (type) {
-      case "audioType":
-        mediaConstraints = {
-          audio: {
-            deviceId,
-          },
-          video: false,
-        };
-        audio = true;
-        break;
-
-      case "videoType":
-        mediaConstraints = {
-          audio: false,
-          video: {
-            width: {
-              min: 640,
-              ideal: 1920,
-            },
-            height: {
-              min: 480,
-              ideal: 1080,
-            },
-            deviceId,
-          },
-        };
-        break;
-
-      case "screenType":
-        mediaConstraints = false;
-        screen = true;
-        break;
-
-      default:
-        break;
-    }
-
-    if (!mediasoupDevice?.canProduce("video") && !audio) {
-      console.error("Cannot produce video");
-      return;
-    }
-    if (producerLabel.has(type)) {
-      console.log("Producer already exists for this type", type);
-      return;
-    }
-    if (!producerTransport) {
-      console.error("No producer transport");
-      return;
-    }
-
-    try {
-      const stream = screen
-        ? await navigator.mediaDevices.getDisplayMedia()
-        : await navigator.mediaDevices.getUserMedia(mediaConstraints);
-
-      const track = audio ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
-      if (!track) throw new Error("No media track available");
-      const params: ProducerOptions = { track };
-
-      if (!audio && !screen) {
-        params.encodings = [
-          {
-            rid: "r0",
-            maxBitrate: 100000,
-            //scaleResolutionDownBy: 10.0,
-            scalabilityMode: "S1T3",
-          },
-          {
-            rid: "r1",
-            maxBitrate: 300000,
-            scalabilityMode: "S1T3",
-          },
-          {
-            rid: "r2",
-            maxBitrate: 900000,
-            scalabilityMode: "S1T3",
-          },
-        ];
-
-        params.codecOptions = {
-          videoGoogleStartBitrate: 1000,
-        };
-      }
-
-      const producer = await producerTransport.produce(params);
-      if (!producer) {
-        console.log("No Producer");
+  const closeProducer = useCallback(
+    (type: string) => {
+      if (!producerLabel.has(type)) {
+        console.log("There is no producer of this type ", type);
         return;
       }
 
+      const producerId = producerLabel.get(type);
+      console.log("close producer", producerId);
+
+      socket.emit("producer_closed", { producerId });
+      producers.get(producerId!)?.close();
+
       setProducers((prev) => {
         const newMap = new Map(prev);
-        newMap.set(producer.id, producer);
+        newMap.delete(producerId!);
         return newMap;
       });
 
-      if (!audio) {
-        setLocalMedia((prev) => [...prev, { type, stream }]);
-      }
-
-      producer.on("trackended", () => {
-        closeProducer(type);
-      });
-
-      producer.on("@close", () => {
-        console.log("Closing Producer");
-
-        for (const track of stream.getTracks()) {
-          track.stop();
-        }
-
-        setProducers((prev) => {
-          const newMap = new Map(prev);
-          newMap.delete(producer.id);
-          return newMap;
+      if (type !== "audioType") {
+        setLocalMedia((prev) => {
+          return prev.filter((media) => media.type !== type);
         });
-      });
+      }
 
       setProducerLabel((prev) => {
         const newMap = new Map(prev);
-        newMap.set(type, producer.id);
+        newMap.delete(type);
         return newMap;
       });
-    } catch (error) {
-      console.error("Produce Error: ", error);
-    }
-  };
+    },
+    [producerLabel, producers]
+  );
+
+  const produce = useCallback(
+    async (type: string, deviceId: string = "") => {
+      let mediaConstraints = {};
+      let audio = false;
+      let screen = false;
+
+      switch (type) {
+        case "audioType":
+          mediaConstraints = {
+            audio: {
+              deviceId: deviceId,
+            },
+            video: false,
+          };
+          audio = true;
+          break;
+        case "videoType":
+          mediaConstraints = {
+            audio: false,
+            video: {
+              width: {
+                min: 640,
+                ideal: 1920,
+              },
+              height: {
+                min: 400,
+                ideal: 1080,
+              },
+              deviceId: deviceId,
+            },
+          };
+          break;
+        case "screenType":
+          mediaConstraints = false;
+          screen = true;
+          break;
+        default:
+          return;
+      }
+
+      if (!mediasoupDevice?.canProduce("video") && !audio) {
+        console.error("Cannot produce video");
+        return;
+      }
+      if (producerLabel.has(type)) {
+        console.log("Producer already exists for this type ", type);
+        return;
+      }
+      if (!producerTransport) {
+        console.error("no producer transport");
+        return;
+      }
+
+      // console.log("Media constraints:", mediaConstraints);
+      try {
+        const stream = screen
+          ? await navigator.mediaDevices.getDisplayMedia()
+          : await navigator.mediaDevices.getUserMedia(mediaConstraints);
+        // console.log(navigator.mediaDevices.getSupportedConstraints());
+
+        const track = audio ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
+        if (!track) throw new Error("No media track available");
+        const params: ProducerOptions = { track };
+
+        if (!audio && !screen) {
+          params.encodings = [
+            {
+              rid: "r0",
+              maxBitrate: 100000,
+              //scaleResolutionDownBy: 10.0,
+              scalabilityMode: "S1T3",
+            },
+            {
+              rid: "r1",
+              maxBitrate: 300000,
+              scalabilityMode: "S1T3",
+            },
+            {
+              rid: "r2",
+              maxBitrate: 900000,
+              scalabilityMode: "S1T3",
+            },
+          ];
+          params.codecOptions = {
+            videoGoogleStartBitrate: 1000,
+          };
+        }
+
+        const producer = await producerTransport.produce(params);
+        if (!producer) {
+          console.log("no producer");
+          return;
+        }
+        // console.log("Producer:", producer);
+        setProducers((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(producer.id, producer);
+          return newMap;
+        });
+
+        if (!audio) {
+          // console.log(stream);
+          setLocalMedia((prev) => [...prev, { type, stream }]);
+          // setLocalMedia();
+        }
+
+        producer.on("trackended", () => {
+          closeProducer(type);
+        });
+
+        producer.on("@close", () => {
+          console.log("Closing producer");
+          // if (!audio) {
+          for (const track of stream.getTracks()) {
+            track.stop();
+          }
+          // }
+
+          setProducers((prev) => {
+            const newMap = new Map(prev);
+            newMap.delete(producer.id);
+            return newMap;
+          });
+        });
+
+        setProducerLabel((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(type, producer.id);
+          return newMap;
+        });
+      } catch (error) {
+        console.error("Produce Error:", error);
+      }
+    },
+    [closeProducer, mediasoupDevice, producerLabel, producerTransport]
+  );
 
   const removeConsumer = (consumerId: string) => {
-    console.log("removing a consumer:", consumerId);
+    console.log("removing a consumer", consumerId);
     setRemoteStreams((prev) => {
       return prev.filter((media) => {
         if (media.id === consumerId) {
@@ -316,29 +306,35 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         return true;
       });
     });
+
+    // setConsumers((prev) => {
+    //   const newMap = new Map(prev);
+    //   newMap.delete(consumerId);
+    //   return newMap;
+    // });
   };
 
   const consume = useCallback(
     async (producerId: string) => {
-      if (!consumerTransport || !mediasoupDevice) {
-        console.log("No consumer transport or mediasoup device");
-        console.log("[DEBUG] consumer Transport:", consumerTransport);
-        console.log("[DEBUG] media device:", mediasoupDevice);
-        console.log("[DEBUG] consumer transport connection state:", consumerTransport?.connectionState);
+      if (!mediasoupDevice || !consumerTransport) {
+        console.log("consumer Transport:", consumerTransport);
+        console.log("media device:", mediasoupDevice);
+        console.log("consumer transport connection state:", consumerTransport?.connectionState);
+
+        console.log("No mediasoup device or consumer Transport");
         console.log("");
         return;
       }
 
-      console.log("consuming");
       const res = await getConsumeStream(producerId, mediasoupDevice, consumerTransport);
       if (!res) {
-        console.warn("Failed to consume media");
+        console.log("Failed to consume media");
         return;
       }
 
       const stream = new MediaStream();
       stream.addTrack(res.consumer.track);
-      setRemoteStreams((prev) => [...prev, { id: res.consumer.id, stream }]);
+      setRemoteStreams((prev) => [...prev, { id: res.consumer.id, type: res.consumer.track.kind, stream: stream }]);
 
       res.consumer.on("trackended", () => {
         console.log("track ended");
@@ -385,33 +381,32 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
   // JOIN AND CREATE DEVICE
   useEffect(() => {
     (async () => {
-      if (!name) throw new Error("No name provided");
-      // if (!gotLocalMedia) return;
-      if (mediasoupDevice) return;
+      if (!name) return;
+      if (!mediasoupDevice) {
+        const json = await socketRequest("join", { name });
+        console.log("Joined room", json);
 
-      const json = await socketRequest("join", { name });
-      console.log("Joined Room: ", json);
+        const data = (await socketRequest("get_router_rtp_capabilities")) as {
+          rtpCapabilities: RtpCapabilities;
+          error?: unknown;
+        };
+        if (data.error) {
+          console.error(data.error);
+          return;
+        }
 
-      const { rtpCapabilities, error } = (await socketRequest("get_router_rtp_capabilities")) as {
-        rtpCapabilities: RtpCapabilities;
-        error?: unknown;
-      };
+        const dev = await createMediasoupDevice(data.rtpCapabilities);
+        if (!dev) {
+          console.error("Failed to create Device");
+          return;
+        }
 
-      if (error) {
-        console.error(error);
-        return;
+        setMediasoupDevice(dev);
       }
-
-      const device = await createMediasoupDevice(rtpCapabilities);
-      if (!device) {
-        console.error("Failed to create device");
-        return;
-      }
-      setMediasoupDevice(device);
     })();
   }, [mediasoupDevice, name]);
 
-  // INIT TRANSPORTS
+  // INIT CONSUMER TRANSPORT
   useEffect(() => {
     (async () => {
       if (mediasoupDevice && !consumerTransport) {
@@ -420,6 +415,7 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
           console.error("Failed to initialize transports");
           return;
         }
+        // console.log(res);
 
         setProducerTransport(res.pTransport);
         setConsumerTransport(res.cTransport);
@@ -427,42 +423,34 @@ const Videochat = ({ mic = false, camera = false, screen = false, name = "" }: p
         socket.emit("get_producers");
       }
     })();
-  }, [consumerTransport, mediasoupDevice, producerTransport]);
+  }, [consumerTransport, mediasoupDevice]);
 
   // INIT SOCKETS
   useEffect(() => {
-    if (!consumerTransport) {
-      console.log("No consumer transport");
-      return;
+    if (consumerTransport) {
+      socket.on("consumer_closed", ({ consumerId }: { consumerId: string }) => {
+        console.log("closing consumer:", consumerId);
+        removeConsumer(consumerId);
+      });
+
+      socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
+        // if (data.length === 0) return;
+
+        console.log("New producers:", data);
+        for (const { producerId } of data) {
+          await consume(producerId);
+        }
+      });
+
+      socket.on("disconnect", () => {
+        exit(true);
+      });
+
+      return () => {
+        clean();
+      };
     }
-
-    socket.on("consumer_closed", ({ consumerId }: { consumerId: string }) => {
-      console.log("closing consumer:", consumerId);
-      removeConsumer(consumerId);
-    });
-
-    socket.on("new_producers", async (data: { producerId: string; producerSocketId: string }[]) => {
-      console.log("New producers:", data);
-      const producerIds = data.map((p) => p.producerId);
-      setPendingConsumerIds((prev) => [...prev, ...producerIds]);
-    });
-
-    socket.on("disconnect", () => {
-      exit(true);
-    });
-
-    return () => {
-      clean();
-    };
   }, [clean, consume, consumerTransport, exit]);
-
-  // RESOLVE PENDING CONSUMERS
-  useEffect(() => {
-    if (pendingConsumerIds.length === 0) return;
-
-    for (const id of pendingConsumerIds) consume(id);
-    setPendingConsumerIds([]);
-  }, [consume, consumerTransport?.connectionState, pendingConsumerIds, pendingConsumerIds.length]);
 
   // HANDLE FUNCTIONS
   const handleMicrophone = () => {
